@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
+<<<<<<< HEAD
  * SDM845 OnePlus 6T (fajita) device tree.
+=======
+ * SDM845 OnePlus 6T (fajita) specific device tree
+>>>>>>> 638cf296611f (arm64: dts: sdm845: add oneplus 6/t devices)
  *
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
  */
