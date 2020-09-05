@@ -11,8 +11,3 @@
 	model = "OnePlus 6T";
 	compatible = "oneplus,fajita", "oneplus,oneplus6", "qcom,sdm845";
 };
-
-&display_panel {
-	compatible = "samsung,s6e3fc2x01";
-	status = "okay";
-};

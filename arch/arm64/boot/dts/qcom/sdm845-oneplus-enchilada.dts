@@ -11,8 +11,3 @@
 	model = "OnePlus 6";
 	compatible = "oneplus,enchilada", "oneplus,oneplus6", "qcom,sdm845";
 };
-
-&display_panel {
-	compatible = "samsung,sofef00";
-	status = "okay";
-};

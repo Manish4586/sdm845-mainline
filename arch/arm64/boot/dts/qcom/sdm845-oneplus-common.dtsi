@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * SDM845 OnePlus 6(T) (enchilada / fajita) common device tree source
- *
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * NOTE: To avoid conflicts with the on-device dtbs the dtbo partition must be
+ * erased before this kernel can be booted.
  */
 
 /dts-v1/;
@@ -106,11 +107,6 @@
 			gpios = <&pm8998_gpio 6 GPIO_ACTIVE_LOW>;
 			debounce-interval = <15>;
 		};
-	};
-
-	extcon_usb1: extcon-usb-1 {
-		compatible = "linux,extcon-usb-gpio";
-		id-gpio = <&tlmm 38 GPIO_ACTIVE_HIGH>;
 	};
 };
 
@@ -542,7 +538,6 @@
 &usb_1 {
 	status = "okay";
 
-	/* disable USB3 clock requirement as we are in USB 2 mode */
 	qcom,select-utmi-as-pipe-clk;
 };
 
@@ -555,8 +550,6 @@
 
 	/* fastest mode for USB 2 */
 	maximum-speed = "high-speed";
-
-	extcon = <&extcon_usb1>;
 
 	/* Remove USB3 phy */
 	phys = <&usb_1_hsphy>;
@@ -630,7 +623,7 @@
 };
 
 &dsi0_phy {
-	status = "okay";
+	status = "disabled";
 	vdds-supply = <&vdda_mipi_dsi0_pll>;
 };
 
@@ -640,21 +633,6 @@
 
 &qupv3_id_0 {
 	status = "okay";
-};
-
-/*
- * Disable until the battery reporting
- * stats can be fixed
- */
-&i2c10 {
-		status = "disabled";
-		clock-frequency = <100000>;
-
-		bq27541_battery: bq27541-battery@55 {
-				status = "okay";
-				compatible = "ti,bq27541";
-				reg = <0x55>;
-		};
 };
 
 &qup_i2c10_default {
