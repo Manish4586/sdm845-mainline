@@ -244,5 +244,7 @@ void msm_csid_get_csid_id(struct media_entity *entity, u8 *id);
 
 extern const struct csid_hw_ops csid_ops_4_1;
 extern const struct csid_hw_ops csid_ops_4_7;
+extern const struct csid_hw_ops csid_ops_170;
+
 
 #endif /* QC_MSM_CAMSS_CSID_H */
