@@ -569,9 +569,9 @@ static int ath10k_qmi_cap_send_sync_msg(struct ath10k_qmi *qmi)
 
 	if (resp->resp.result != QMI_RESULT_SUCCESS_V01) {
 		ath10k_err(ar, "capability req rejected: %d\n", resp->resp.error);
-		ret = -EINVAL;
-		goto out;
-	}
+//		ret = -EINVAL;
+//		goto out;
+	} //HERE
 
 	if (resp->chip_info_valid) {
 		qmi->chip_info.chip_id = resp->chip_info.chip_id;
