@@ -612,7 +612,7 @@
 			 &quat_mi2s_sd2_active
 			 &quat_mi2s_sd3_active>;
 	pinctrl-names = "default";
-	model = "Xiaomi Poco F1";
+	model = "xiaomi-beryllium";
 	audio-routing =
 		"MM_DL1",  "MultiMedia1 Playback";
 
