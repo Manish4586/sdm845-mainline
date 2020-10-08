@@ -464,13 +464,6 @@
 	status = "okay";
 };
 
-&q6afedai {
-	qi2s@22 {
-		reg = <22>;
-		qcom,sd-lines = <0 1 2 3>;
-	};
-};
-
 &q6asmdai {
 	dai@0 {
 		reg = <0>;
@@ -478,10 +471,6 @@
 
 	dai@1 {
 		reg = <1>;
-	};
-
-	dai@2 {
-		reg = <2>;
 	};
 };
 
@@ -700,6 +689,12 @@
 
 &i2c12 {
 	status = "okay";
+
+	dmas = <&gpi_dma0 0 5 QCOM_GPI_I2C>,
+	       <&gpi_dma0 1 5 QCOM_GPI_I2C>;
+	dma-names = "tx", "rx";
+
+	clock-frequency = <400000>;
 
 	touchscreen: synaptics-rmi4-i2c@20 {
 		compatible = "syna,rmi4-i2c";
