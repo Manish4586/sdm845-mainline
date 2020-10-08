@@ -7,6 +7,7 @@
 
 /dts-v1/;
 
+#include <dt-bindings/dma/qcom-gpi.h>
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/regulator/qcom,rpmh-regulator.h>
 #include <dt-bindings/input/linux-event-codes.h>
@@ -675,29 +676,14 @@
 	status = "okay";
 };
 
-&i2c5 {
-	status="okay";
-
-	dmas = <&gpi_dma0 0 5 QCOM_GPI_I2C>,
-	       <&gpi_dma0 1 5 QCOM_GPI_I2C>;
-	dma-names = "tx", "rx";
-
-	/*smart PA*/
-	tas2559_codec: tas2559@4c{
-		#sound-dai-cells = <1>;
-		compatible = "ti,tas2559";
-		reg = <0x4c>;
-		ti,tas2559-reset-gpio = <&tlmm 12 0>;
-		ti,tas2560-reset-gpio = <&tlmm 76 0>;
-		ti,tas2559-irq-gpio = <&tlmm 11 0>;
-		ti,tas2560-irq-gpio = <&tlmm 30 0>;
-		ti,tas2559-addr = <0x4c>;
-		ti,tas2560-addr = <0x4d>;
-		ti,tas2559-channel = <0>; /* 0, left; 1, right */
-		ti,tas2560-channel = <1>; /* 0, left; 1, right */
-		ti,ycrc-enable = <1>; /* 0, disable; non-zero, enable */
-		ti,echo-ref = <0>; /* 0, left channel; 1, right channel; 2, both */
-		ti,bit-rate = <16>; /* 16, 20, 24, 32 */
+&i2c4 {
+	status = "disabled";
+	max98927@3a {
+		compatible = "maxim,max98927";
+		reg = <0x3a>;
+		vmon-slot-no = <0>;
+		imon-slot-no = <1>;
+		interleave-mode = <0>;
 	};
 };
 
@@ -761,19 +747,15 @@
 
 &sound {
 	compatible = "qcom,db845c-sndcard";
-	pinctrl-0 = <&quat_mi2s_active
-			 &quat_mi2s_sd0_active
-			 &quat_mi2s_sd1_active
-			 &quat_mi2s_sd2_active
-			 &quat_mi2s_sd3_active>;
-	pinctrl-names = "default";
-	model = "OnePlus 6";
+	model = "sdm845-tavil-qrd-snd-card";
+
 	audio-routing =
 		"RX_BIAS", "MCLK",
 		"AMIC2", "MIC BIAS2",
+		"SpkrLeft IN", "SPK1 OUT",
+		"SpkrRight IN", "SPK2 OUT",
 		"MM_DL1",  "MultiMedia1 Playback",
-		"MM_DL2",  "MultiMedia2 Playback",
-		"MultiMedia3 Capture", "MM_UL3";
+		"MultiMedia2 Capture", "MM_UL2";
 
 	mm1-dai-link {
 		link-name = "MultiMedia1";
@@ -789,28 +771,6 @@
 		};
 	};
 
-	mm3-dai-link {
-		link-name = "MultiMedia3";
-		cpu {
-			sound-dai = <&q6asmdai  MSM_FRONTEND_DAI_MULTIMEDIA3>;
-		};
-	};
-
-	tas2559-dai-link {
-		link-name = "Primary Spkr Playback";
-		cpu {
-			sound-dai = <&q6afedai QUATERNARY_MI2S_RX>;
-		};
-
-		platform {
-			sound-dai = <&q6routing>;
-		};
-
-		codec {
-			sound-dai =  <&tas2559_codec 0>;
-		};
-	};
-
 	slim-dai-link {
 		link-name = "SLIM Playback";
 		cpu {
@@ -822,7 +782,7 @@
 		};
 
 		codec {
-			sound-dai =  <&wcd9340 0>;
+			sound-dai =  <&left_spkr>, <&right_spkr>, <&swm 0>, <&wcd9340 0>;
 		};
 	};
 
@@ -840,6 +800,7 @@
 			sound-dai = <&wcd9340 1>;
 		};
 	};
+
 };
 
 &wcd9340{
@@ -853,7 +814,28 @@
 	vdd-tx-supply = <&vreg_s4a_1p8>;
 	vdd-rx-supply = <&vreg_s4a_1p8>;
 	vdd-io-supply = <&vreg_s4a_1p8>;
+
+	swm: swm@c85 {
+		left_spkr: wsa8810-left{
+			compatible = "sdw10217211000";
+			reg = <0 3>;
+			powerdown-gpios = <&wcdgpio 2 GPIO_ACTIVE_HIGH>;
+			#thermal-sensor-cells = <0>;
+			sound-name-prefix = "SpkrLeft";
+			#sound-dai-cells = <0>;
+		};
+
+		right_spkr: wsa8810-right{
+			compatible = "sdw10217211000";
+			powerdown-gpios = <&wcdgpio 3 GPIO_ACTIVE_HIGH>;
+			reg = <0 4>;
+			#thermal-sensor-cells = <0>;
+			sound-name-prefix = "SpkrRight";
+			#sound-dai-cells = <0>;
+		};
+	};
 };
+
 
 /* PINCTRL - additions to nodes defined in sdm845.dtsi */
 
@@ -911,6 +893,34 @@
 			qcom,drive-strength = <0>;
 		};
 	};
+};
+
+&pmi8998_lsid1 {
+	lpg@d000 {
+		compatible = "qcom,pmi8998-lpg";
+		reg = <0xd000 0x100>;
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		qcom,power-source = <1>;
+
+		led@1 {
+			reg = <1>;
+			label = "red:user0";
+		};
+
+		led@2 {
+			reg = <2>;
+			label = "green:user1";
+			default-state = "on";
+		};
+
+		led@3 {
+			reg = <3>;
+			label = "blue:user2";
+		};
+    };
 };
 
 &tlmm {
