@@ -3429,7 +3429,7 @@ static void clear_cycle_counter(struct fg_chip *chip)
 		chip->cyc_ctr.last_soc[i] = 0;
 	}
 	rc = fg_sram_write(chip, (u8 *)&chip->cyc_ctr.count,
-			sizeof(chip->cyc_ctr.count) / sizeof(u8 *),
+			sizeof(chip->cyc_ctr.count) / sizeof(u16),
 			cyc_ctr.address, cyc_ctr.offset, false);
 	if (rc < 0)
 		dev_err(chip->dev, "failed to clear cycle counter: %d\n", rc);
@@ -4278,21 +4278,21 @@ static int fg_hw_init(struct fg_chip *chip)
 		return rc;
 	}
 
-	fg_encode(chip->param[FG_SETTING_BCL_LM_THR],
-			chip->dt.bcl_lm_ma, buf);
-	rc = fg_set_param(chip, FG_SETTING_BCL_LM_THR, buf);
-	if (rc) {
-		dev_err(chip->dev, "failed to set blc_lm: %d\n", rc);
-		return rc;
-	}
+	// fg_encode(chip->param[FG_SETTING_BCL_LM_THR],
+	// 		chip->dt.bcl_lm_ma, buf);
+	// rc = fg_set_param(chip, FG_SETTING_BCL_LM_THR, buf);
+	// if (rc) {
+	// 	dev_err(chip->dev, "failed to set blc_lm: %d\n", rc);
+	// 	return rc;
+	// }
 
-	fg_encode(chip->param[FG_SETTING_BCL_MH_THR],
-			chip->dt.bcl_mh_ma, buf);
-	rc = fg_set_param(chip, FG_SETTING_BCL_MH_THR, buf);
-	if (rc) {
-		dev_err(chip->dev, "failed to set blc_mh: %d\n", rc);
-		return rc;
-	}
+	// fg_encode(chip->param[FG_SETTING_BCL_MH_THR],
+	// 		chip->dt.bcl_mh_ma, buf);
+	// rc = fg_set_param(chip, FG_SETTING_BCL_MH_THR, buf);
+	// if (rc) {
+	// 	dev_err(chip->dev, "failed to set blc_mh: %d\n", rc);
+	// 	return rc;
+	// }
 
 	if (chip->dt.recharge_thr > 0) {
 		fg_encode(chip->param[FG_SETTING_RECHARGE_THR],
@@ -5969,12 +5969,35 @@ static enum power_supply_property fg_properties[] = {
 	POWER_SUPPLY_PROP_STATUS,
 };
 
+static int fg_set_property(struct power_supply *psy,
+		enum power_supply_property psp,
+		const union power_supply_propval *val);
+
 static int fg_get_property(struct power_supply *psy,
 		enum power_supply_property psp,
 		union power_supply_propval *val)
 {
 	struct fg_chip *chip = power_supply_get_drvdata(psy);
 	int error = 0;
+
+    pr_info("Property read");
+
+    // Always update charging status based on current now on property read (when else????)
+    fg_get_param(chip, FG_DATA_CURRENT, &val->intval);
+    if (val->intval > 200 && chip->status != POWER_SUPPLY_STATUS_DISCHARGING) { // discharging
+        pr_info("Set status to discharging");
+        chip->status = POWER_SUPPLY_STATUS_DISCHARGING;
+		schedule_work(&chip->status_change_work);
+    }
+    else if (val->intval < -200 && chip->status != POWER_SUPPLY_STATUS_CHARGING) { // charging
+        pr_info("Set status to charging");
+        chip->status = POWER_SUPPLY_STATUS_CHARGING;
+		schedule_work(&chip->status_change_work);
+    }
+    // else {
+    //     chip->status = POWER_SUPPLY_STATUS_NOT_CHARGING;
+	// 	schedule_work(&chip->status_change_work);
+    // }
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_MANUFACTURER:
