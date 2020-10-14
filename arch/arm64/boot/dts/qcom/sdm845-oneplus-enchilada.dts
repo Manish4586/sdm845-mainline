@@ -6,6 +6,7 @@
  */
 
 #include "sdm845-oneplus-common.dtsi"
+#include <dt-bindings/dma/qcom-gpi.h>
 
 / {
 	model = "OnePlus 6";
@@ -16,4 +17,64 @@
 	status = "okay";
 
 	compatible = "samsung,sofef00";
+};
+
+&i2c4 {
+	dmas = <&gpi_dma0 0 4 3 64 0>,
+			<&gpi_dma0 1 4 3 64 0>;
+		dma-names = "tx", "rx";
+	
+	status = "okay";
+	max98927_codec: max98927@3a {
+		compatible = "maxim,max98927";
+		reg = <0x3a>;
+		pinctrl-names = "default", "suspend";
+		pinctrl-0 = <&speaker_default>;
+		pinctrl-1 = <&speaker_suspend>;
+		vmon-slot-no = <0>;
+		imon-slot-no = <1>;
+		#sound-dai-cells = <1>;
+	};
+};
+
+&sound {
+	model = "OnePlus6";
+	audio-routing =	"RX_BIAS", "MCLK",
+			"AMIC2", "MIC BIAS2",
+			"AMIC3", "MIC BIAS4",
+			"AMIC4", "MIC BIAS1",
+			"AMIC5", "MIC BIAS4",
+			"DMIC0", "MIC BIAS1",
+			"DMIC1", "MIC BIAS1",
+			"DMIC2", "MIC BIAS3",
+			"DMIC3", "MIC BIAS3",
+			"DMIC4", "MIC BIAS4",
+			"DMIC5", "MIC BIAS4",
+			"MM_DL1", "MultiMedia1 Playback",
+			"MM_DL2", "MultiMedia2 Playback",
+			"MultiMedia3 Capture", "MM_UL3",
+			"MM_DL4", "MultiMedia4 Playback",
+			"MM_DL5", "MultiMedia5 Playback",
+			"MM_DL6", "MultiMedia6 Playback",
+			"MM_DL7", "MultiMedia7 Playback",
+			"MM_DL8", "MultiMedia8 Playback",
+			"DAI Sel Mux", "Left Spk",
+			"DAI Sel Mux", "Right Spk",
+			"SLIMBUS_0_RX Audio Mixer MultiMedia1", "1"
+			//"DAI Sel Mux", "LeftRight Spk";
+
+	max98927-dai-link {
+		link-name = "Speaker Playback";
+		cpu {
+			sound-dai = <&q6afedai QUATERNARY_MI2S_RX>;
+		};
+
+		platform {
+			sound-dai = <&q6routing>;
+		};
+
+		codec {
+			sound-dai = <&max98927_codec 0>;
+		};
+	};
 };

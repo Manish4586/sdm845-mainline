@@ -665,18 +665,136 @@
 	status = "okay";
 };
 
-&i2c4 {
-	status = "okay";
-	max98927_codec: max98927@3a {
-		compatible = "maxim,max98927";
-		reg = <0x3a>;
-		pinctrl-names = "default", "suspend";
-		pinctrl-0 = <&speaker_default>;
-		pinctrl-1 = <&speaker_suspend>;
-		vmon-slot-no = <0>;
-		imon-slot-no = <1>;
-		interleave-mode = <0>;
-		#sound-dai-cells = <1>;
+&q6afedai {
+	qi2s@22 {
+		reg = <22>;
+		qcom,sd-lines = <0 1 2 3>;
+	};
+};
+
+&q6asmdai {
+	dai@0 {
+		reg = <0>;
+	};
+
+	dai@1 {
+		reg = <1>;
+	};
+
+	dai@2 {
+		reg = <2>;
+	};
+
+	dai@3 {
+		reg = <3>;
+	};
+
+	dai@4 {
+		reg = <4>;
+	};
+
+	dai@5 {
+		reg = <5>;
+	};
+
+	dai@6 {
+		reg = <6>;
+	};
+
+	dai@7 {
+		reg = <7>;
+	};
+};
+
+&sound {
+	compatible = "qcom,sdm845-sndcard";
+	pinctrl-0 = <&quat_mi2s_active &quat_mi2s_sd0_active &quat_mi2s_sd1_active &quat_mi2s_sd2_active &quat_mi2s_sd3_active>;
+	pinctrl-names = "default";
+
+	mm1-dai-link {
+		link-name = "MultiMedia1";
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA1>;
+		};
+	};
+
+	mm2-dai-link {
+		link-name = "MultiMedia2";
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA2>;
+		};
+	};
+
+	mm3-dai-link {
+		link-name = "MultiMedia3";
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA3>;
+		};
+	};
+
+	mm4-dai-link {
+		link-name = "MultiMedia4";
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA4>;
+		};
+	};
+
+	mm5-dai-link {
+		link-name = "MultiMedia5";
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA5>;
+		};
+	};
+
+	mm6-dai-link {
+		link-name = "MultiMedia6";
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA6>;
+		};
+	};
+
+	mm7-dai-link {
+		link-name = "MultiMedia7";
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA7>;
+		};
+	};
+
+	mm8-dai-link {
+		link-name = "MultiMedia8";
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA8>;
+		};
+	};
+
+	slim-dai-link {
+		link-name = "SLIM Playback";
+		cpu {
+			sound-dai = <&q6afedai SLIMBUS_0_RX>;
+		};
+
+		platform {
+			sound-dai = <&q6routing>;
+		};
+
+		codec {
+			sound-dai = <&wcd9340 0>;
+		};
+	};
+
+	slimcap-dai-link {
+		link-name = "SLIM Capture";
+		cpu {
+			sound-dai = <&q6afedai SLIMBUS_0_TX>;
+		};
+
+		platform {
+			sound-dai = <&q6routing>;
+		};
+
+		codec {
+			sound-dai = <&wcd9340 1>;
+		};
 	};
 };
 
@@ -753,47 +871,63 @@
 };
 
 &sound {
-	compatible = "qcom,db845c-sndcard";
-	model = "OnePlus6"; //"sdm845-tavil-qrd-snd-card";
-	pinctrl-0 = <&quat_mi2s_active
-			 &quat_mi2s_sd0_active
-			 &quat_mi2s_sd1_active
-			 &quat_mi2s_sd2_active
-			 &quat_mi2s_sd3_active>;
+	compatible = "qcom,sdm845-sndcard";
+	pinctrl-0 = <&quat_mi2s_active &quat_mi2s_sd0_active &quat_mi2s_sd1_active &quat_mi2s_sd2_active &quat_mi2s_sd3_active>;
 	pinctrl-names = "default";
-	// audio-routing =
-	// 	"RX_BIAS", "MCLK",
-	// 	"AMIC2", "MIC BIAS2",
-	// 	"MM_DL1",  "MultiMedia1 Playback",
-	// 	"MM_DL2",  "MultiMedia2 Playback",
-	// 	"MultiMedia3 Capture", "MM_UL3";
 
 	mm1-dai-link {
 		link-name = "MultiMedia1";
 		cpu {
-			sound-dai = <&q6asmdai  MSM_FRONTEND_DAI_MULTIMEDIA1>;
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA1>;
 		};
 	};
 
 	mm2-dai-link {
 		link-name = "MultiMedia2";
 		cpu {
-			sound-dai = <&q6asmdai  MSM_FRONTEND_DAI_MULTIMEDIA2>;
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA2>;
 		};
 	};
 
-	max98927-dai-link {
-		link-name = "Primary Spkr Playback";
+	mm3-dai-link {
+		link-name = "MultiMedia3";
 		cpu {
-			sound-dai = <&q6afedai QUATERNARY_MI2S_RX>;
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA3>;
 		};
+	};
 
-		platform {
-			sound-dai = <&q6routing>;
+	mm4-dai-link {
+		link-name = "MultiMedia4";
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA4>;
 		};
+	};
 
-		codec {
-			sound-dai = <&max98927_codec 0>;
+	mm5-dai-link {
+		link-name = "MultiMedia5";
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA5>;
+		};
+	};
+
+	mm6-dai-link {
+		link-name = "MultiMedia6";
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA6>;
+		};
+	};
+
+	mm7-dai-link {
+		link-name = "MultiMedia7";
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA7>;
+		};
+	};
+
+	mm8-dai-link {
+		link-name = "MultiMedia8";
+		cpu {
+			sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA8>;
 		};
 	};
 
@@ -808,7 +942,7 @@
 		};
 
 		codec {
-			sound-dai =  <&wcd9340 0>;
+			sound-dai = <&wcd9340 0>;
 		};
 	};
 
@@ -826,10 +960,10 @@
 			sound-dai = <&wcd9340 1>;
 		};
 	};
-
 };
 
-&wcd9340{
+
+&wcd9340 {
 	pinctrl-0 = <&wcd_intr_default>;
 	pinctrl-names = "default";
 	clock-names = "extclk";
