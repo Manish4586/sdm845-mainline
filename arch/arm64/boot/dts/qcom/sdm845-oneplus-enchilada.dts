@@ -20,20 +20,32 @@
 };
 
 &i2c4 {
-	dmas = <&gpi_dma0 0 4 3 64 0>,
-			<&gpi_dma0 1 4 3 64 0>;
+	dmas = <&gpi_dma0 0 4 3>,
+			<&gpi_dma0 1 4 3>;
 		dma-names = "tx", "rx";
 	
 	status = "okay";
 	max98927_codec: max98927@3a {
-		compatible = "maxim,max98927";
+		compatible = "maxim,max98927L";
 		reg = <0x3a>;
-		pinctrl-names = "default", "suspend";
-		pinctrl-0 = <&speaker_default>;
-		pinctrl-1 = <&speaker_suspend>;
-		vmon-slot-no = <0>;
-		imon-slot-no = <1>;
-		#sound-dai-cells = <1>;
+		mono_stereo_mode = <0>;
+		maxim,98927-reset-gpio = <&tlmm 69 0>;
+		status = "okay";
+		// compatible = "maxim,max98927";
+		// reg = <0x3a>;
+		// pinctrl-names = "default", "suspend";
+		// pinctrl-0 = <&speaker_default>;
+		// pinctrl-1 = <&speaker_suspend>;
+		// vmon-slot-no = <0>;
+		// imon-slot-no = <1>;
+		// #sound-dai-cells = <1>;
+	};
+};
+
+&q6afedai {
+	qi2s@22 {
+		reg = <22>;
+		qcom,sd-lines = <0 1 2 3>;
 	};
 };
 
@@ -57,10 +69,10 @@
 			"MM_DL5", "MultiMedia5 Playback",
 			"MM_DL6", "MultiMedia6 Playback",
 			"MM_DL7", "MultiMedia7 Playback",
-			"MM_DL8", "MultiMedia8 Playback",
-			"DAI Sel Mux", "Left Spk",
-			"DAI Sel Mux", "Right Spk",
-			"SLIMBUS_0_RX Audio Mixer MultiMedia1", "1"
+			"MM_DL8", "MultiMedia8 Playback";
+			// "DAI Sel Mux", "LeftRight",
+			// "SpkrLeft IN", "SPK1 OUT",
+			// "SpkrRight IN", "SPK2 OUT";
 			//"DAI Sel Mux", "LeftRight Spk";
 
 	max98927-dai-link {

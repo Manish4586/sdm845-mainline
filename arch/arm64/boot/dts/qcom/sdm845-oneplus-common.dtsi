@@ -849,13 +849,6 @@
 	};
 };
 
-&q6afedai {
-	qi2s@22 {
-		reg = <22>;
-		qcom,sd-lines = <0 1 2 3>;
-	};
-};
-
 &q6asmdai {
 	dai@0 {
 		reg = <0>;
@@ -1068,7 +1061,7 @@
 
 	speaker_default: speaker-default {
 		pins = "gpio69";
-		function = "gpio";
+		function = "spkr_i2s";
 
 		output-high;
 		drive-strength = <8>;
@@ -1077,7 +1070,7 @@
 
 	speaker_suspend: speaker-suspend {
 		pins = "gpio69";
-		function = "gpio";
+		function = "spkr_i2s";
 
 		drive-strength = <2>;
 		bias-pull-down;
