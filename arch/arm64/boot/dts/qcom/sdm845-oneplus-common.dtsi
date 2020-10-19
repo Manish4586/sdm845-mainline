@@ -14,8 +14,6 @@
 
 // Needed for some GPIO (like the volume buttons)
 #include "pm8998.dtsi"
-
-// For LEDs
 #include "pmi8998.dtsi"
 
 / {
@@ -57,7 +55,7 @@
 
 		state-top {
 			label = "Tri-state key top";
-			linux,code = <KEY_A>;
+			linux,code = <KEY_MACRO1>;
 			// gpios = <&tlmm 40 GPIO_ACTIVE_LOW>;
 			interrupt-parent = <&tlmm>;
 			interrupts = <24 IRQ_TYPE_EDGE_FALLING>;
@@ -67,7 +65,7 @@
 
 		state-middle {
 			label = "Tri-state key middle";
-			linux,code = <KEY_B>;
+			linux,code = <KEY_MACRO2>;
 			// gpios = <&tlmm 42 GPIO_ACTIVE_LOW>;
 			interrupt-parent = <&tlmm>;
 			interrupts = <52 IRQ_TYPE_EDGE_FALLING>;
@@ -77,7 +75,7 @@
 
 		state-bottom {
 			label = "Tri-state key bottom";
-			linux,code = <KEY_C>;
+			linux,code = <KEY_MACRO3>;
 			// gpios = <&tlmm 26 GPIO_ACTIVE_LOW>;
 			interrupt-parent = <&tlmm>;
 			interrupts = <126 IRQ_TYPE_EDGE_FALLING>;
