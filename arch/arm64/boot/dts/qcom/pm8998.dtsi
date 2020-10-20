@@ -6,6 +6,7 @@
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/spmi/spmi.h>
 #include <dt-bindings/thermal/thermal.h>
+#include <dt-bindings/leds/common.h>
 
 / {
 	thermal-zones {
@@ -108,5 +109,53 @@
 		reg = <0x1 SPMI_USID>;
 		#address-cells = <1>;
 		#size-cells = <0>;
+
+		lpg {
+			compatible = "qcom,pmi8998-lpg";
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			qcom,power-source = <1>;
+
+			multi-led {
+				color = <LED_COLOR_ID_MULTI>;
+				label = "rgb:notification";
+
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				led@3 {
+				reg = <3>;
+				color = <LED_COLOR_ID_RED>;
+				};
+
+				led@4 {
+				reg = <4>;
+				color = <LED_COLOR_ID_GREEN>;
+				};
+
+				led@5 {
+				reg = <5>;
+				color = <LED_COLOR_ID_BLUE>;
+				};
+			};
+
+			// led@1 {
+			// 	reg = <3>;
+			// 	label = "red";
+			// };
+
+			// led@2 {
+			// 	reg = <4>;
+			// 	label = "green";
+			// 	default-state = "on";
+			// };
+
+			// led@3 {
+			// 	reg = <5>;
+			// 	label = "blue";
+			// };
+		};
 	};
 };
