@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2020 Caleb Connolly <caleb@connolly.tech>
  * Generated with linux-mdss-dsi-panel-driver-generator from vendor device tree:
- *   Copyright (c) 2020, The Linux Foundation. All rights reserved.
- *
- * Caleb Connolly <caleb@connolly.tech>
+ * Copyright (c) 2020, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/delay.h>
@@ -12,6 +10,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/regulator/consumer.h>
+#include <linux/swab.h>
 
 #include <video/mipi_display.h>
 
@@ -20,22 +19,20 @@
 #include <drm/drm_panel.h>
 #include <linux/backlight.h>
 
-struct oneplus6_panel {
+struct sofef00_panel {
 	struct drm_panel panel;
 	struct mipi_dsi_device *dsi;
-	struct backlight_device *backlight;
 	struct regulator *supply;
 	struct gpio_desc *reset_gpio;
 	struct gpio_desc *enable_gpio;
 	const struct drm_display_mode *mode;
 	bool prepared;
-	bool enabled;
 };
 
 static inline
-struct oneplus6_panel *to_oneplus6_panel(struct drm_panel *panel)
+struct sofef00_panel *to_sofef00_panel(struct drm_panel *panel)
 {
-	return container_of(panel, struct oneplus6_panel, panel);
+	return container_of(panel, struct sofef00_panel, panel);
 }
 
 #define dsi_dcs_write_seq(dsi, seq...) do {				\
@@ -46,13 +43,13 @@ struct oneplus6_panel *to_oneplus6_panel(struct drm_panel *panel)
 			return ret;					\
 	} while (0)
 
-static void oneplus6_panel_reset(struct oneplus6_panel *ctx)
+static void sofef00_panel_reset(struct sofef00_panel *ctx)
 {
 	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
 	usleep_range(5000, 6000);
 }
 
-static int oneplus6_panel_on(struct oneplus6_panel *ctx)
+static int sofef00_panel_on(struct sofef00_panel *ctx)
 {
 	struct mipi_dsi_device *dsi = ctx->dsi;
 	struct device *dev = &dsi->dev;
@@ -92,7 +89,7 @@ static int oneplus6_panel_on(struct oneplus6_panel *ctx)
 	return 0;
 }
 
-static int oneplus6_panel_off(struct oneplus6_panel *ctx)
+static int sofef00_panel_off(struct sofef00_panel *ctx)
 {
 	struct mipi_dsi_device *dsi = ctx->dsi;
 	struct device *dev = &dsi->dev;
@@ -117,18 +114,18 @@ static int oneplus6_panel_off(struct oneplus6_panel *ctx)
 	return 0;
 }
 
-static int oneplus6_panel_prepare(struct drm_panel *panel)
+static int sofef00_panel_prepare(struct drm_panel *panel)
 {
-	struct oneplus6_panel *ctx = to_oneplus6_panel(panel);
+	struct sofef00_panel *ctx = to_sofef00_panel(panel);
 	struct device *dev = &ctx->dsi->dev;
 	int ret;
 
 	if (ctx->prepared)
 		return 0;
 
-	oneplus6_panel_reset(ctx);
+	sofef00_panel_reset(ctx);
 
-	ret = oneplus6_panel_on(ctx);
+	ret = sofef00_panel_on(ctx);
 	if (ret < 0) {
 		dev_err(dev, "Failed to initialize panel: %d\n", ret);
 		gpiod_set_value_cansleep(ctx->reset_gpio, 0);
@@ -139,9 +136,9 @@ static int oneplus6_panel_prepare(struct drm_panel *panel)
 	return 0;
 }
 
-static int oneplus6_panel_unprepare(struct drm_panel *panel)
+static int sofef00_panel_unprepare(struct drm_panel *panel)
 {
-	struct oneplus6_panel *ctx = to_oneplus6_panel(panel);
+	struct sofef00_panel *ctx = to_sofef00_panel(panel);
 	struct device *dev = &ctx->dsi->dev;
 	int ret;
 
@@ -154,7 +151,7 @@ static int oneplus6_panel_unprepare(struct drm_panel *panel)
 		return ret;
 	}
 
-	ret = oneplus6_panel_off(ctx);
+	ret = sofef00_panel_off(ctx);
 	if (ret < 0)
 		dev_err(dev, "Failed to un-initialize panel: %d\n", ret);
 
@@ -164,44 +161,6 @@ static int oneplus6_panel_unprepare(struct drm_panel *panel)
 	ctx->prepared = false;
 	return 0;
 }
-
-
-static int oneplus6_panel_enable(struct drm_panel *panel)
-{
-	struct oneplus6_panel *ctx = to_oneplus6_panel(panel);
-	int ret;
-
-	if (ctx->enabled)
-		return 0;
-
-	ret = backlight_enable(ctx->backlight);
-	if (ret < 0) {
-		dev_err(&ctx->dsi->dev, "Failed to enable backlight: %d\n", ret);
-		return ret;
-	}
-
-	ctx->enabled = true;
-	return 0;
-}
-
-static int oneplus6_panel_disable(struct drm_panel *panel)
-{
-	struct oneplus6_panel *ctx = to_oneplus6_panel(panel);
-	int ret;
-
-	if (!ctx->enabled)
-		return 0;
-
-	ret = backlight_disable(ctx->backlight);
-	if (ret < 0) {
-		dev_err(&ctx->dsi->dev, "Failed to disable backlight: %d\n", ret);
-		return ret;
-	}
-
-	ctx->enabled = false;
-	return 0;
-}
-
 
 static const struct drm_display_mode enchilada_panel_mode = {
 	.clock = (1080 + 112 + 16 + 36) * (2280 + 36 + 8 + 12) * 60 / 1000,
@@ -231,11 +190,11 @@ static const struct drm_display_mode fajita_panel_mode = {
 	.height_mm = 145,
 };
 
-static int oneplus6_panel_get_modes(struct drm_panel *panel,
+static int sofef00_panel_get_modes(struct drm_panel *panel,
 						struct drm_connector *connector)
 {
 	struct drm_display_mode *mode;
-	struct oneplus6_panel *ctx = to_oneplus6_panel(panel);
+	struct sofef00_panel *ctx = to_sofef00_panel(panel);
 
 	mode = drm_mode_duplicate(connector->dev, ctx->mode);
 	if (!mode)
@@ -251,15 +210,13 @@ static int oneplus6_panel_get_modes(struct drm_panel *panel,
 	return 1;
 }
 
-static const struct drm_panel_funcs oneplus6_panel_panel_funcs = {
-	.disable = oneplus6_panel_disable,
-	.enable = oneplus6_panel_enable,
-	.prepare = oneplus6_panel_prepare,
-	.unprepare = oneplus6_panel_unprepare,
-	.get_modes = oneplus6_panel_get_modes,
+static const struct drm_panel_funcs sofef00_panel_panel_funcs = {
+	.prepare = sofef00_panel_prepare,
+	.unprepare = sofef00_panel_unprepare,
+	.get_modes = sofef00_panel_get_modes,
 };
 
-static int oneplus6_panel_bl_get_brightness(struct backlight_device *bl)
+static int sofef00_panel_bl_get_brightness(struct backlight_device *bl)
 {
 	struct mipi_dsi_device *dsi = bl_get_data(bl);
 	int err;
@@ -273,14 +230,14 @@ static int oneplus6_panel_bl_get_brightness(struct backlight_device *bl)
 	return brightness & 0xff;
 }
 
-static int oneplus6_panel_bl_update_status(struct backlight_device *bl)
+static int sofef00_panel_bl_update_status(struct backlight_device *bl)
 {
 	struct mipi_dsi_device *dsi = bl_get_data(bl);
 	int err;
 	unsigned short brightness;
 
 	// This panel needs the high and low bytes swapped for the brightness value
-	brightness = ((bl->props.brightness<<8)&0xff00)|((bl->props.brightness>>8)&0x00ff);
+	brightness = __swab16(bl->props.brightness);
 
 	err = mipi_dsi_dcs_set_display_brightness(dsi, brightness);
 	if (err < 0) {
@@ -290,31 +247,30 @@ static int oneplus6_panel_bl_update_status(struct backlight_device *bl)
 	return 0;
 }
 
-static const struct backlight_ops oneplus6_panel_bl_ops = {
-	.update_status = oneplus6_panel_bl_update_status,
-	.get_brightness = oneplus6_panel_bl_get_brightness,
+static const struct backlight_ops sofef00_panel_bl_ops = {
+	.update_status = sofef00_panel_bl_update_status,
+	.get_brightness = sofef00_panel_bl_get_brightness,
 };
 
 static struct backlight_device *
-oneplus6_panel_create_backlight(struct mipi_dsi_device *dsi)
+sofef00_create_backlight(struct mipi_dsi_device *dsi)
 {
 	struct device *dev = &dsi->dev;
-	struct backlight_properties props = {
+	const struct backlight_properties props = {
 		.type = BACKLIGHT_PLATFORM,
-		.scale = BACKLIGHT_SCALE_LINEAR,
-		.brightness = 255,
-		.max_brightness = 512,
+		.brightness = 512,
+		.max_brightness = 1023,
 	};
 
 	return devm_backlight_device_register(dev, dev_name(dev), dev, dsi,
-						  &oneplus6_panel_bl_ops, &props);
+					      &sofef00_panel_bl_ops, &props);
 }
 
 
-static int oneplus6_panel_probe(struct mipi_dsi_device *dsi)
+static int sofef00_panel_probe(struct mipi_dsi_device *dsi)
 {
 	struct device *dev = &dsi->dev;
-	struct oneplus6_panel *ctx;
+	struct sofef00_panel *ctx;
 	int ret;
 
 	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
@@ -342,12 +298,10 @@ static int oneplus6_panel_probe(struct mipi_dsi_device *dsi)
 		return ret;
 	}
 
-	ctx->backlight = oneplus6_panel_create_backlight(dsi);
-	if (IS_ERR(ctx->backlight)) {
-		ret = PTR_ERR(ctx->backlight);
-		dev_err(dev, "Failed to create backlight: %d\n", ret);
-		return ret;
-	}
+	ctx->panel.backlight = sofef00_create_backlight(dsi);
+	if (IS_ERR(ctx->panel.backlight))
+		return dev_err_probe(dev, PTR_ERR(ctx->panel.backlight),
+				     "Failed to create backlight\n");
 
 	ctx->dsi = dsi;
 	mipi_dsi_set_drvdata(dsi, ctx);
@@ -355,7 +309,7 @@ static int oneplus6_panel_probe(struct mipi_dsi_device *dsi)
 	dsi->lanes = 4;
 	dsi->format = MIPI_DSI_FMT_RGB888;
 
-	drm_panel_init(&ctx->panel, dev, &oneplus6_panel_panel_funcs,
+	drm_panel_init(&ctx->panel, dev, &sofef00_panel_panel_funcs,
 			   DRM_MODE_CONNECTOR_DSI);
 
 	ret = drm_panel_add(&ctx->panel);
@@ -375,9 +329,9 @@ static int oneplus6_panel_probe(struct mipi_dsi_device *dsi)
 	return 0;
 }
 
-static int oneplus6_panel_remove(struct mipi_dsi_device *dsi)
+static int sofef00_panel_remove(struct mipi_dsi_device *dsi)
 {
-	struct oneplus6_panel *ctx = mipi_dsi_get_drvdata(dsi);
+	struct sofef00_panel *ctx = mipi_dsi_get_drvdata(dsi);
 	int ret;
 
 	ret = mipi_dsi_detach(dsi);
@@ -389,29 +343,29 @@ static int oneplus6_panel_remove(struct mipi_dsi_device *dsi)
 	return 0;
 }
 
-static const struct of_device_id oneplus6_panel_of_match[] = {
-	{
+static const struct of_device_id sofef00_panel_of_match[] = {
+	{ // OnePlus 6 / enchilada
 		.compatible = "samsung,sofef00",
 		.data = &enchilada_panel_mode,
 	},
-	{
+	{ // OnePlus 6T / fajita
 		.compatible = "samsung,s6e3fc2x01",
 		.data = &fajita_panel_mode,
 	},
 	{ /* sentinel */ }
 };
-MODULE_DEVICE_TABLE(of, oneplus6_panel_of_match);
+MODULE_DEVICE_TABLE(of, sofef00_panel_of_match);
 
-static struct mipi_dsi_driver oneplus6_panel_driver = {
-	.probe = oneplus6_panel_probe,
-	.remove = oneplus6_panel_remove,
+static struct mipi_dsi_driver sofef00_panel_driver = {
+	.probe = sofef00_panel_probe,
+	.remove = sofef00_panel_remove,
 	.driver = {
 		.name = "panel-oneplus6",
-		.of_match_table = oneplus6_panel_of_match,
+		.of_match_table = sofef00_panel_of_match,
 	},
 };
 
-module_mipi_dsi_driver(oneplus6_panel_driver);
+module_mipi_dsi_driver(sofef00_panel_driver);
 
 MODULE_AUTHOR("Caleb Connolly <caleb@connolly.tech>");
 MODULE_DESCRIPTION("DRM driver for Samsung AMOLED DSI panels found in OnePlus 6/6T phones");
