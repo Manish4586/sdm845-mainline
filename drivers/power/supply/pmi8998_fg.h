@@ -1,5 +1,5 @@
 
-#define FG_PARAM_MAX 49
+// #define FG_PARAM_MAX 49
 
 /**** Registers *****/
 
@@ -42,7 +42,7 @@ enum pmi8998_rev {
 	DIG_REV_1 = 0x1,
 	DIG_REV_2 = 0x2,
 	DIG_REV_3 = 0x3,
-}
+};
 
 enum fg_sram_param_id {
 	FG_DATA_BATT_TEMP = 0,
@@ -102,6 +102,7 @@ enum fg_sram_param_id {
 
 struct pmi8998_sram_param {
 	u16	address;
+	u8	offset;
 	unsigned int length;
 	int value;
 
@@ -117,7 +118,7 @@ struct pmi8998_sram_param {
 	const char *name;
 };
 
-static struct fg_sram_param pmi8998_sram_params_v2[FG_PARAM_MAX] = {
+static struct pmi8998_sram_param pmi8998_sram_params_v2[FG_PARAM_MAX] = {
 	[FG_DATA_BATT_TEMP] = {
 		.address	= 0x50,
 		.type		= BATT_BASE_PARAM,
@@ -136,4 +137,43 @@ static struct fg_sram_param pmi8998_sram_params_v2[FG_PARAM_MAX] = {
 		.wa_flags	= PMI8998_V2_REV_WA,
 		.decode		= fg_decode_value_16b,
 	},
-}
+	[FG_DATA_CURRENT] = {
+		.address	= 0xa2,
+		.length		= 2,
+		.type		= BATT_BASE_PARAM,
+		.wa_flags	= PMI8998_V2_REV_WA,
+		.numrtr		= 1000,
+		.denmtr		= 488281,
+		.decode 	= fg_decode_current,
+	},
+};
+
+struct pmi8998_fg_chip {
+	struct device *dev;
+	struct regmap *regmap;
+	struct mutex lock;
+
+	struct power_supply *bms_psy;
+
+	u8 revision[4];
+	enum pmic pmic_version;
+	bool ima_supported;
+	bool reset_on_lockup;
+
+	/* base addresses of components*/
+	unsigned int soc_base;
+	unsigned int batt_base;
+	unsigned int mem_base;
+
+	struct pmi8998_sram_param *sram_params;
+	struct battery_info batt_info;
+
+	struct fg_learning_data learning_data;
+	struct fg_rslow_data rslow_comp;
+	int health;
+	int status;
+	int vbatt_est_diff;
+
+	//board specific init fn
+	int (*init_fn)(struct fg_chip *);
+};

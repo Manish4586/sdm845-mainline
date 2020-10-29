@@ -211,7 +211,7 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 
 	chip->regmap = dev_get_regmap(pdev->dev.parent, NULL);
 	if (!chip.regmap) {
-		dev_err(&chip->dev, "failed to locat the regmap\n");
+		dev_err(&chip->dev, "failed to locate the regmap\n");
 		return -ENODEV;
 	}
 
@@ -219,27 +219,26 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 
 	prop_addr = of_get_address(pdev->dev.of_node, 0, NULL, NULL);
 	if (!prop_addr) {
-		dev_err(chip->dev, "Can't get address of pmi8998_fg\n");
+		dev_err(chip->dev, "Couldn't read SOC base address from dt\n");
 		return -EINVAL;
 	}
 	chip->soc_base = be32_to_cpu(*prop_addr);
 
 	prop_addr = of_get_address(pdev->dev.of_node, 1, NULL, NULL);
 	if (!prop_addr) {
-		dev_err(chip->dev, "invalid IO resources\n");
+		dev_err(chip->dev, "Couldn't read BATT base address from dt\n");
 		return -EINVAL;
 	}
 	chip->batt_base = be32_to_cpu(*prop_addr);
 
 	prop_addr = of_get_address(pdev->dev.of_node, 2, NULL, NULL);
 	if (!prop_addr) {
-		dev_err(chip->dev, "invalid IO resources\n");
+		dev_err(chip->dev, "Couldn't read MEM base address from dts\n");
 		return -EINVAL;
 	}
 	chip->mem_base = be32_to_cpu(*prop_addr);
 
-	chip->sram = pmi8998_sram_params_v2;
-
+	chip->sram_params = pmi8998_sram_params_v2;
 	chip->power_status = POWER_SUPPLY_STATUS_DISCHARGING;
 
 	// Init memif (chip hardware info)
@@ -260,8 +259,7 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	 * IACS_INTR_SRC_SLCT is BIT(3)
 	 */
 	rc = pmi8998_masked_write(chip,
-		chip->mem_base + MEM_INTF_IMA_CFG, BIT(3),
-		BIT(3));
+		chip->mem_base + MEM_INTF_IMA_CFG, BIT(3), BIT(3));
 	if (rc) {
 		dev_err(chip->dev,
 			"failed to configure interrupt source %d\n",
@@ -276,14 +274,13 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	}
 
 	// Check and clear DMA errors
-	rc = fg_read(chip, &dma_status, chip->mem_base + 0x70, 1);
+	rc = pmi8998_read(chip, &dma_status, chip->mem_base + 0x70, 1);
 	if (rc < 0) {
-		pr_err("failed to dma_status, rc=%d\n", rc);
+		pr_err("failed to read dma_status, rc=%d\n", rc);
 		return rc;
 	}
 
 	error_present = dma_status & (BIT(1) | BIT(2));
-
 	rc = pmi8998_masked_write(chip, chip->mem_base + 0x71, BIT(0),
 			error_present ? BIT(0) : 0);
 	if (rc < 0) {
@@ -294,11 +291,11 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	// TODO: Init properties
 	
 	pmi8998_battery_profile_init(&chip);
-
+	//pmi8998_hw_init();
 	return 0;
 }
 
-static int fg_remove(struct platform_device *pdev)
+static int pmi8998_fg_remove(struct platform_device *pdev)
 {
 	return 0;
 }
