@@ -9,28 +9,90 @@
 #include <linux/mutex.h>
 #include <linux/types.h>
 #include <linux/power_supply.h>
+#include <linux/module.h>
 
 #include "pmi8998_fg.h"
 
-struct pmi8998_fg_info {
-	struct device *dev;
-	struct regmap *regmap;
-	struct mutex *lock;
 
-	struct power_supply *supply;
+static int64_t twos_compliment_extend(int64_t val, int nbytes)
+{
+	int i;
+	int64_t mask;
 
-	/* base addresses of components*/
-	unsigned int soc_base;
-	unsigned int batt_base;
-	unsigned int mem_base;
+	mask = 0x80LL << ((nbytes - 1) * 8);
+	if (val & mask) {
+		for (i = 8; i > nbytes; i--) {
+			mask = 0xFFLL << ((i - 1) * 8);
+			val |= mask;
+		}
+	}
 
-	struct pmi8998_sram_param *sram;
+	return val;
+}
 
-	// Chip hardware info
-	u8 revision[4];
-	enum pmic pmic_version;
-    
-	int power_status;
+static int pmi8998_decode_temperature(struct pmi8998_sram_param sp, u8 *val)
+{
+	int temp;
+
+	temp = ((val[1] & BATT_TEMP_MSB_MASK) << 8) |
+		(val[0] & BATT_TEMP_LSB_MASK);
+	temp = DIV_ROUND_CLOSEST(temp * sp.denmtr, sp.numrtr);
+
+	return temp + sp.val_offset;
+}
+
+static int pmi8998_decode_value_16b(struct pmi8998_sram_param sp, u8 *value)
+{
+	int temp = 0, i;
+	if (sp.wa_flags & PMI8998_V2_REV_WA)
+		for (i = 0; i < sp.length; ++i)
+			temp |= value[i] << (8 * (sp.length - i));
+	else
+		for (i = 0; i < sp.length; ++i)
+			temp |= value[i] << (8 * i);
+	return div_u64((u64)(u16)temp * sp.denmtr, sp.numrtr) + sp.val_offset;
+}
+
+static int pmi8998_decode_current(struct pmi8998_sram_param sp, u8 *val)
+{
+	int64_t temp;
+	if (sp.wa_flags & PMI8998_V1_REV_WA)
+		temp = val[0] << 8 | val[1];
+	else
+		temp = val[1] << 8 | val[0];
+	temp = twos_compliment_extend(temp, 2);
+	return div_s64((s64)temp * sp.denmtr,
+			sp.numrtr);
+}
+
+static struct pmi8998_sram_param pmi8998_sram_params_v2[FG_PARAM_MAX] = {
+	[FG_DATA_BATT_TEMP] = {
+		.address	= 0x50,
+		.type		= BATT_BASE_PARAM,
+		.length		= 2,
+		.numrtr		= 4,
+		.denmtr		= 10,		//Kelvin to DeciKelvin
+		.val_offset	= -2730,	//DeciKelvin to DeciDegc
+		.decode		= pmi8998_decode_temperature
+	},
+	[FG_DATA_VOLTAGE] = {
+		.address	= 0xa0,
+		.type		= BATT_BASE_PARAM,
+		.length		= 2,
+		.numrtr		= 122070,
+		.denmtr		= 1000,
+		.wa_flags	= PMI8998_V2_REV_WA,
+		.decode		= pmi8998_decode_value_16b,
+	},
+	[FG_DATA_CURRENT] = {
+		.address	= 0xa2,
+		.length		= 2,
+		.type		= BATT_BASE_PARAM,
+		.wa_flags	= PMI8998_V2_REV_WA,
+		.numrtr		= 1000,
+		.denmtr		= 488281,
+		.decode 	= pmi8998_decode_current,
+	},
 };
 
 /************************
@@ -46,14 +108,14 @@ struct pmi8998_fg_info {
  * @param len Number of registers (bytes) to read
  * @return int 0 on success, negative errno on error
  */
-static int pmi8998_read(struct regmap *map, u8 *val, u16 addr, int len)
+static int pmi8998_read(struct pmi8998_fg_chip *chip, u8 *val, u16 addr, int len)
 {
 	if ((addr & 0xff00) == 0) {
-		dev_err(&chip->dev, "base cannot be zero base=0x%02x\n", addr);
+		dev_err(chip->dev, "base cannot be zero base=0x%02x\n", addr);
 		return -EINVAL;
 	}
 
-	return regmap_bulk_read(map, addr, val, len);
+	return regmap_bulk_read(chip->regmap, addr, val, len);
 }
 
 /**
@@ -65,45 +127,89 @@ static int pmi8998_read(struct regmap *map, u8 *val, u16 addr, int len)
  * @param len 
  * @return int 
  */
-static int pmi8998_write(struct regmap *map, u8 *val, u16 addr, int len)
+static int pmi8998_write(struct pmi8998_fg_chip *chip, u8 *val, u16 addr, int len)
 {
 	int rc;
 	bool sec_access = (addr & 0xff) > 0xd0;
 	u8 sec_addr_val = 0xa5;
 
 	if (sec_access) {
-		rc = regmap_bulk_write(map,
+		rc = regmap_bulk_write(chip->regmap,
 				(addr & 0xff00) | 0xd0,
 				&sec_addr_val, 1);
 	}
 
 	if ((addr & 0xff00) == 0) {
-		dev_err(&chip->dev, "addr cannot be zero base=0x%02x\n", addr);
+		dev_err(chip->dev, "addr cannot be zero base=0x%02x\n", addr);
 		return -EINVAL;
 	}
 
-	return regmap_bulk_write(map, addr, val, len);
+	return regmap_bulk_write(chip->regmap, addr, val, len);
 }
 
-static int pmi8998_masked_write(struct regmap *map, u16 addr,
+static int pmi8998_masked_write(struct pmi8998_fg_chip *chip, u16 addr,
 		u8 mask, u8 val)
 {
 	int error;
 	u8 reg;
-	error = pmi8998_read(map, &reg, addr, 1);
+	error = pmi8998_read(chip, &reg, addr, 1);
 	if (error)
 		return error;
 
 	reg &= ~mask;
 	reg |= val & mask;
 
-	error = pmi8998_write(map, &reg, addr, 1);
+	error = pmi8998_write(chip, &reg, addr, 1);
 	return error;
 }
 
 /*************************
  * MISC
  * ***********************/
+
+/* IMA_IACS_CLR			BIT(2)
+   IMA_IACS_RDY			BIT(1) */
+static int pmi8998_iacs_clear_sequence(struct pmi8998_fg_chip *chip)
+{
+	int rc = 0;
+	u8 temp;
+
+	/* clear the error */
+	rc = pmi8998_masked_write(chip, chip->mem_base + MEM_INTF_IMA_CFG,
+				BIT(2), BIT(2));
+	if (rc) {
+		pr_err("Error writing to IMA_CFG, rc=%d\n", rc);
+		return rc;
+	}
+
+	temp = 0x4;
+	rc = pmi8998_write(chip, &temp, chip->mem_base + MEM_INTF_ADDR_LSB + 1, 1);
+	if (rc) {
+		pr_err("Error writing to MEM_INTF_ADDR_MSB, rc=%d\n", rc);
+		return rc;
+	}
+
+	temp = 0x0;
+	rc = pmi8998_write(chip, &temp, chip->mem_base + MEM_INTF_WR_DATA0 + 3, 1);
+	if (rc) {
+		pr_err("Error writing to WR_DATA3, rc=%d\n", rc);
+		return rc;
+	}
+
+	rc = pmi8998_read(chip, &temp, chip->mem_base + MEM_INTF_RD_DATA0 + 3, 1);
+	if (rc) {
+		pr_err("Error writing to RD_DATA3, rc=%d\n", rc);
+		return rc;
+	}
+
+	rc = pmi8998_masked_write(chip, chip->mem_base + MEM_INTF_IMA_CFG,
+				BIT(2), 0);
+	if (rc) {
+		pr_err("Error writing to IMA_CFG, rc=%d\n", rc);
+		return rc;
+	}
+	return rc;
+}
 
 /**
  * @brief Checks and clears IMA status registers on error
@@ -112,7 +218,7 @@ static int pmi8998_masked_write(struct regmap *map, u16 addr,
  * @param check_hw_sts 
  * @return int 
  */
-static int pmi8998_clear_ima(struct fg_chip *chip,
+static int pmi8998_clear_ima(struct pmi8998_fg_chip *chip,
 		bool check_hw_sts)
 {
 	int rc = 0, ret = 0;
@@ -122,14 +228,14 @@ static int pmi8998_clear_ima(struct fg_chip *chip,
 	rc = pmi8998_read(chip, &err_sts,
 			chip->mem_base + MEM_INTF_IMA_ERR_STS, 1);
 	if (rc) {
-		dev_err(&chip->dev, "failed to read IMA_ERR_STS, rc=%d\n", rc);
+		dev_err(chip->dev, "failed to read IMA_ERR_STS, rc=%d\n", rc);
 		return rc;
 	}
 
 	rc = pmi8998_read(chip, &exp_sts,
 			chip->mem_base + MEM_INTF_IMA_EXP_STS, 1);
 	if (rc) {
-		dev_err(&chip->dev, "Error in reading IMA_EXP_STS, rc=%d\n", rc);
+		dev_err(chip->dev, "Error in reading IMA_EXP_STS, rc=%d\n", rc);
 		return rc;
 	}
 
@@ -138,7 +244,7 @@ static int pmi8998_clear_ima(struct fg_chip *chip,
 		rc = pmi8998_read(chip, &hw_sts,
 				chip->mem_base + MEM_INTF_IMA_HW_STS, 1);
 		if (rc) {
-			dev_err(&chip->dev, "Error in reading IMA_HW_STS, rc=%d\n", rc);
+			dev_err(chip->dev, "Error in reading IMA_HW_STS, rc=%d\n", rc);
 			return rc;
 		}
 		/*
@@ -148,7 +254,7 @@ static int pmi8998_clear_ima(struct fg_chip *chip,
 		 * exception errors.
 		 */
 		if ((hw_sts & 0x0f) != hw_sts >> 4) {
-			dev_err(&chip->dev, "IMA HW not in correct state, hw_sts=%x\n",
+			dev_err(chip->dev, "IMA HW not in correct state, hw_sts=%x\n",
 					hw_sts);
 			run_err_clr_seq = true;
 		}
@@ -166,16 +272,16 @@ static int pmi8998_clear_ima(struct fg_chip *chip,
 	if (exp_sts & (BIT(0) | BIT(1) | BIT(3) |
 		BIT(4) | BIT(5) | BIT(6) |
 		BIT(7))) {
-		dev_warn(&chip->dev, "IMA exception bit set, exp_sts=%x\n", exp_sts);
+		dev_warn(chip->dev, "IMA exception bit set, exp_sts=%x\n", exp_sts);
 		run_err_clr_seq = true;
 	}
 
 	if (run_err_clr_seq) {
-		ret = fg_run_iacs_clear_sequence(chip);
+		ret = pmi8998_iacs_clear_sequence(chip);
 		if (!ret)
 			return -EAGAIN;
 		else
-			dev_err(&chip->dev, "Error clearing IMA exception ret=%d\n", ret);
+			dev_err(chip->dev, "Error clearing IMA exception ret=%d\n", ret);
 	}
 
 	return rc;
@@ -185,19 +291,20 @@ static int pmi8998_clear_ima(struct fg_chip *chip,
  * Init stuff
  * ******************/
 
-static int pmi8998_battery_profile_init(struct pmi8998_fg_chip *chip)
-{
-	struct device_node *batt_node;
-	struct device_node *node = chip->dev->of_node;
-	int rc = 0, len = 0;
-	const char *data;
-}
+// static int pmi8998_battery_profile_init(struct pmi8998_fg_chip *chip)
+// {
+// 	struct device_node *batt_node;
+// 	struct device_node *node = chip->dev->of_node;
+// 	int rc = 0, len = 0;
+// 	const char *data;
+// }
 
 static int pmi8998_fg_probe(struct platform_device *pdev)
 {
-	struct power_supply_config supply_config = {};
+	// struct power_supply_config supply_config = {};
     struct pmi8998_fg_chip *chip;
 	const __be32 *prop_addr;
+	int rc = 0;
 	u8 dma_status;
 	bool error_present;
 
@@ -210,8 +317,8 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	mutex_init(&chip->lock);
 
 	chip->regmap = dev_get_regmap(pdev->dev.parent, NULL);
-	if (!chip.regmap) {
-		dev_err(&chip->dev, "failed to locate the regmap\n");
+	if (!chip->regmap) {
+		dev_err(chip->dev, "failed to locate the regmap\n");
 		return -ENODEV;
 	}
 
@@ -239,16 +346,15 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	chip->mem_base = be32_to_cpu(*prop_addr);
 
 	chip->sram_params = pmi8998_sram_params_v2;
-	chip->power_status = POWER_SUPPLY_STATUS_DISCHARGING;
 
 	// Init memif (chip hardware info)
-	rc = pmi8998_read(chip->regmap, chip->revision, chip->mem_base + DIG_MINOR, 4);
+	rc = pmi8998_read(chip, chip->revision, chip->mem_base + DIG_MINOR, 4);
 	if (rc) {
 		dev_err(chip->dev, "Unable to read FG revision rc=%d\n", rc);
 		return rc;
 	}
 
-	dev_info(&chip->dev, "pmi8998 revision DIG:%d.%d ANA:%d.%d\n",
+	dev_info(chip->dev, "pmi8998 revision DIG:%d.%d ANA:%d.%d\n",
 		chip->revision[DIG_MAJOR], chip->revision[DIG_MINOR],
 		chip->revision[ANA_MAJOR], chip->revision[ANA_MINOR]);
 	
@@ -269,7 +375,7 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 
 	rc = pmi8998_clear_ima(chip, true);
 	if (rc && rc != -EAGAIN) {
-		dev_err(&chip->dev, "Error clearing IMA, exception rc=%d", rc);
+		dev_err(chip->dev, "Error clearing IMA, exception rc=%d", rc);
 		return rc;
 	}
 
@@ -289,8 +395,8 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	}
 
 	// TODO: Init properties
-	
-	pmi8998_battery_profile_init(&chip);
+	dev_info(chip->dev, "NO ERRORS, reaches till here\n");
+	//pmi8998_battery_profile_init(&chip);
 	//pmi8998_hw_init();
 	return 0;
 }
@@ -317,5 +423,7 @@ static struct platform_driver qcom_fg_driver = {
 
 module_platform_driver(qcom_fg_driver);
 
+MODULE_AUTHOR("Caleb Connolly <caleb@connolly.tech>");
+MODULE_AUTHOR("Joel Selvaraj <jo@jsfamily.in>");
 MODULE_DESCRIPTION("Qualcomm PMI8998 Fuel Guage Driver");
 MODULE_LICENSE("GPL v2");

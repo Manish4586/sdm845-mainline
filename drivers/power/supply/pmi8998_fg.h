@@ -27,6 +27,9 @@
 #define BATT_INFO_BATT_TEMP_LSB     0x50
 #define BATT_INFO_BATT_TEMP_MSB     0x51
 
+#define BATT_TEMP_LSB_MASK			GENMASK(7, 0)
+#define BATT_TEMP_MSB_MASK			GENMASK(2, 0)
+
 enum wa_flags {
 	PMI8998_V1_REV_WA = BIT(0),
 	PMI8998_V2_REV_WA = BIT(1),
@@ -100,6 +103,13 @@ enum fg_sram_param_id {
 	FG_PARAM_MAX
 };
 
+enum sram_param_type {
+	SRAM_PARAM,
+	MEM_IF_PARAM,
+	BATT_BASE_PARAM,
+	SOC_BASE_PARAM,
+};
+
 struct pmi8998_sram_param {
 	u16	address;
 	u8	offset;
@@ -112,40 +122,28 @@ struct pmi8998_sram_param {
 	int numrtr;
 	int denmtr;
 	int val_offset;
-	void (*encode)(struct fg_sram_param sp, int val, u8 *buf);
-	int (*decode)(struct fg_sram_param sp, u8* val);
+	void (*encode)(struct pmi8998_sram_param sp, int val, u8 *buf);
+	int (*decode)(struct pmi8998_sram_param sp, u8* val);
 
 	const char *name;
 };
 
-static struct pmi8998_sram_param pmi8998_sram_params_v2[FG_PARAM_MAX] = {
-	[FG_DATA_BATT_TEMP] = {
-		.address	= 0x50,
-		.type		= BATT_BASE_PARAM,
-		.length		= 2,
-		.numrtr		= 4,
-		.denmtr		= 10,		//Kelvin to DeciKelvin
-		.val_offset	= -2730,	//DeciKelvin to DeciDegc
-		.decode		= fg_decode_temperature
-	},
-	[FG_DATA_VOLTAGE] = {
-		.address	= 0xa0,
-		.type		= BATT_BASE_PARAM,
-		.length		= 2,
-		.numrtr		= 122070,
-		.denmtr		= 1000,
-		.wa_flags	= PMI8998_V2_REV_WA,
-		.decode		= fg_decode_value_16b,
-	},
-	[FG_DATA_CURRENT] = {
-		.address	= 0xa2,
-		.length		= 2,
-		.type		= BATT_BASE_PARAM,
-		.wa_flags	= PMI8998_V2_REV_WA,
-		.numrtr		= 1000,
-		.denmtr		= 488281,
-		.decode 	= fg_decode_current,
-	},
+struct battery_info {
+	const char *manufacturer;
+	const char *model;
+	const char *serial_num;
+
+	bool cyc_ctr_en;
+	bool nom_cap_unbound;
+
+	u8 thermal_coeffs[6];
+
+	u8 *batt_profile;
+	unsigned batt_profile_len;
+
+	int rconn_mohm;
+	int nom_cap_uah;
+	int batt_max_voltage_uv;
 };
 
 struct pmi8998_fg_chip {
@@ -156,7 +154,6 @@ struct pmi8998_fg_chip {
 	struct power_supply *bms_psy;
 
 	u8 revision[4];
-	enum pmic pmic_version;
 	bool ima_supported;
 	bool reset_on_lockup;
 
@@ -168,12 +165,12 @@ struct pmi8998_fg_chip {
 	struct pmi8998_sram_param *sram_params;
 	struct battery_info batt_info;
 
-	struct fg_learning_data learning_data;
-	struct fg_rslow_data rslow_comp;
+	// struct fg_learning_data learning_data;
+	// struct fg_rslow_data rslow_comp;
 	int health;
 	int status;
 	int vbatt_est_diff;
 
 	//board specific init fn
-	int (*init_fn)(struct fg_chip *);
+	int (*init_fn)(struct pmi8998_fg_chip *);
 };
