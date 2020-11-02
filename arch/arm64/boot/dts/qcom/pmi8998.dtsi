@@ -21,21 +21,13 @@
 
 		pmi8998_fg: fuel_guage {
 			compatible = "qcom,pmi8998-fg";
+			status = "okay";
 			#address-cells = <1>;
 			#size-cells = <0>;
-			//      SOC    BATT   MEM
-			reg = <0x4000 0x4100 0x4400>;
 			
-			qcom,fg-esr-timer-awake = <96 96>;
-			qcom,fg-esr-timer-asleep = <256 256>;
-			qcom,fg-esr-timer-charging = <0 96>;
-			qcom,cycle-counter-en;
-			qcom,hold-soc-while-full;
-			qcom,fg-auto-recharge-soc;
-			qcom,fg-recharge-soc-thr = <98>;
+			reg = <0x4000>;
 
 			qcom,term-current-ma = <100>;
-			status = "okay";
 		};
 	};
 

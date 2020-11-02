@@ -26,13 +26,27 @@
 #define BATT_INFO_IBATT_MSB         0xa3
 #define BATT_INFO_BATT_TEMP_LSB     0x50
 #define BATT_INFO_BATT_TEMP_MSB     0x51
+#define BATT_MONOTONIC_SOC			0x09
 
 #define BATT_TEMP_LSB_MASK			GENMASK(7, 0)
 #define BATT_TEMP_MSB_MASK			GENMASK(2, 0)
 
+#define REG_BASE(chip)				(chip->base)
+#define REG_BATT(chip)				(chip->base + 0x100)
+#define REG_MEM(chip)				(chip->base + 0x400)
+
+/* Interrupt offsets */
+#define INT_RT_STS(base)			(base + 0x10)
+#define INT_EN_CLR(base)			(base + 0x16)
+
+// Param addresses
+#define PARAM_ADDR_BATT_TEMP		0x550
+#define PARAM_ADDR_BATT_VOLTAGE		0xa0
+#define PARAM_ADDR_BATT_CURRENT		0xa2
+
 enum wa_flags {
-	PMI8998_V1_REV_WA = BIT(0),
-	PMI8998_V2_REV_WA = BIT(1),
+	PMI8998_V1_REV_WA,
+	PMI8998_V2_REV_WA,
 };
 
 enum pmi8998_rev_offsets {
@@ -103,11 +117,32 @@ enum fg_sram_param_id {
 	FG_PARAM_MAX
 };
 
-enum sram_param_type {
-	SRAM_PARAM,
-	MEM_IF_PARAM,
-	BATT_BASE_PARAM,
-	SOC_BASE_PARAM,
+// enum sram_param_type {
+// 	SRAM_PARAM,
+// 	MEM_IF_PARAM,
+// 	BATT_BASE_PARAM,
+// 	SOC_BASE_PARAM,
+// };
+
+static enum power_supply_property fg_properties[] = {
+	POWER_SUPPLY_PROP_MANUFACTURER,
+	POWER_SUPPLY_PROP_MODEL_NAME,
+	POWER_SUPPLY_PROP_TECHNOLOGY,
+	POWER_SUPPLY_PROP_CAPACITY,
+	POWER_SUPPLY_PROP_CURRENT_NOW,
+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+	POWER_SUPPLY_PROP_VOLTAGE_OCV,
+	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
+	POWER_SUPPLY_PROP_VOLTAGE_MIN,
+	POWER_SUPPLY_PROP_TEMP,
+	POWER_SUPPLY_PROP_CHARGE_NOW,
+	POWER_SUPPLY_PROP_CHARGE_COUNTER,
+	POWER_SUPPLY_PROP_CHARGE_FULL,
+	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
+	POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT,
+	POWER_SUPPLY_PROP_CYCLE_COUNT,
+	POWER_SUPPLY_PROP_HEALTH,
+	POWER_SUPPLY_PROP_STATUS,
 };
 
 struct pmi8998_sram_param {
@@ -128,26 +163,39 @@ struct pmi8998_sram_param {
 	const char *name;
 };
 
+struct fg_learning_data {
+	struct mutex	learning_lock;
+	bool		active;
+	int64_t		cc_uah;
+	int		learned_cc_uah;
+	int		init_cc_pc_val;
+	int		max_start_soc;
+	int		max_increment;
+	int		max_decrement;
+	int		vbat_est_thr_uv;
+	int		max_cap_limit;
+	int		min_cap_limit;
+	int		min_temp;
+	int		max_temp;
+};
+
 struct battery_info {
 	const char *manufacturer;
 	const char *model;
 	const char *serial_num;
 
-	bool cyc_ctr_en;
-	bool nom_cap_unbound;
+	// u8 *batt_profile;
+	// unsigned batt_profile_len;
 
-	u8 thermal_coeffs[6];
-
-	u8 *batt_profile;
-	unsigned batt_profile_len;
-
-	int rconn_mohm;
 	int nom_cap_uah;
+
+	int batt_max_voltage_uv_design;
 	int batt_max_voltage_uv;
 };
 
 struct pmi8998_fg_chip {
 	struct device *dev;
+	unsigned int base;
 	struct regmap *regmap;
 	struct mutex lock;
 
@@ -155,22 +203,12 @@ struct pmi8998_fg_chip {
 
 	u8 revision[4];
 	bool ima_supported;
-	bool reset_on_lockup;
-
-	/* base addresses of components*/
-	unsigned int soc_base;
-	unsigned int batt_base;
-	unsigned int mem_base;
 
 	struct pmi8998_sram_param *sram_params;
 	struct battery_info batt_info;
 
-	// struct fg_learning_data learning_data;
-	// struct fg_rslow_data rslow_comp;
+	struct fg_learning_data learning_data;
+
 	int health;
 	int status;
-	int vbatt_est_diff;
-
-	//board specific init fn
-	int (*init_fn)(struct pmi8998_fg_chip *);
 };

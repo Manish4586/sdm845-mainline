@@ -10,90 +10,9 @@
 #include <linux/types.h>
 #include <linux/power_supply.h>
 #include <linux/module.h>
+#include <linux/math64.h>
 
 #include "pmi8998_fg.h"
-
-
-static int64_t twos_compliment_extend(int64_t val, int nbytes)
-{
-	int i;
-	int64_t mask;
-
-	mask = 0x80LL << ((nbytes - 1) * 8);
-	if (val & mask) {
-		for (i = 8; i > nbytes; i--) {
-			mask = 0xFFLL << ((i - 1) * 8);
-			val |= mask;
-		}
-	}
-
-	return val;
-}
-
-static int pmi8998_decode_temperature(struct pmi8998_sram_param sp, u8 *val)
-{
-	int temp;
-
-	temp = ((val[1] & BATT_TEMP_MSB_MASK) << 8) |
-		(val[0] & BATT_TEMP_LSB_MASK);
-	temp = DIV_ROUND_CLOSEST(temp * sp.denmtr, sp.numrtr);
-
-	return temp + sp.val_offset;
-}
-
-static int pmi8998_decode_value_16b(struct pmi8998_sram_param sp, u8 *value)
-{
-	int temp = 0, i;
-	if (sp.wa_flags & PMI8998_V2_REV_WA)
-		for (i = 0; i < sp.length; ++i)
-			temp |= value[i] << (8 * (sp.length - i));
-	else
-		for (i = 0; i < sp.length; ++i)
-			temp |= value[i] << (8 * i);
-	return div_u64((u64)(u16)temp * sp.denmtr, sp.numrtr) + sp.val_offset;
-}
-
-static int pmi8998_decode_current(struct pmi8998_sram_param sp, u8 *val)
-{
-	int64_t temp;
-	if (sp.wa_flags & PMI8998_V1_REV_WA)
-		temp = val[0] << 8 | val[1];
-	else
-		temp = val[1] << 8 | val[0];
-	temp = twos_compliment_extend(temp, 2);
-	return div_s64((s64)temp * sp.denmtr,
-			sp.numrtr);
-}
-
-static struct pmi8998_sram_param pmi8998_sram_params_v2[FG_PARAM_MAX] = {
-	[FG_DATA_BATT_TEMP] = {
-		.address	= 0x50,
-		.type		= BATT_BASE_PARAM,
-		.length		= 2,
-		.numrtr		= 4,
-		.denmtr		= 10,		//Kelvin to DeciKelvin
-		.val_offset	= -2730,	//DeciKelvin to DeciDegc
-		.decode		= pmi8998_decode_temperature
-	},
-	[FG_DATA_VOLTAGE] = {
-		.address	= 0xa0,
-		.type		= BATT_BASE_PARAM,
-		.length		= 2,
-		.numrtr		= 122070,
-		.denmtr		= 1000,
-		.wa_flags	= PMI8998_V2_REV_WA,
-		.decode		= pmi8998_decode_value_16b,
-	},
-	[FG_DATA_CURRENT] = {
-		.address	= 0xa2,
-		.length		= 2,
-		.type		= BATT_BASE_PARAM,
-		.wa_flags	= PMI8998_V2_REV_WA,
-		.numrtr		= 1000,
-		.denmtr		= 488281,
-		.decode 	= pmi8998_decode_current,
-	},
-};
 
 /************************
  * IO FUNCTIONS
@@ -108,14 +27,14 @@ static struct pmi8998_sram_param pmi8998_sram_params_v2[FG_PARAM_MAX] = {
  * @param len Number of registers (bytes) to read
  * @return int 0 on success, negative errno on error
  */
-static int pmi8998_read(struct pmi8998_fg_chip *chip, u8 *val, u16 addr, int len)
+static int pmi8998_read(struct regmap *map, u8 *val, u16 addr, int len)
 {
 	if ((addr & 0xff00) == 0) {
-		dev_err(chip->dev, "base cannot be zero base=0x%02x\n", addr);
+		pr_err("base cannot be zero base=0x%02x\n", addr);
 		return -EINVAL;
 	}
 
-	return regmap_bulk_read(chip->regmap, addr, val, len);
+	return regmap_bulk_read(map, addr, val, len);
 }
 
 /**
@@ -127,40 +46,145 @@ static int pmi8998_read(struct pmi8998_fg_chip *chip, u8 *val, u16 addr, int len
  * @param len 
  * @return int 
  */
-static int pmi8998_write(struct pmi8998_fg_chip *chip, u8 *val, u16 addr, int len)
+static int pmi8998_write(struct regmap *map, u8 *val, u16 addr, int len)
 {
 	int rc;
 	bool sec_access = (addr & 0xff) > 0xd0;
 	u8 sec_addr_val = 0xa5;
 
 	if (sec_access) {
-		rc = regmap_bulk_write(chip->regmap,
+		rc = regmap_bulk_write(map,
 				(addr & 0xff00) | 0xd0,
 				&sec_addr_val, 1);
 	}
 
 	if ((addr & 0xff00) == 0) {
-		dev_err(chip->dev, "addr cannot be zero base=0x%02x\n", addr);
+		pr_err("addr cannot be zero base=0x%02x\n", addr);
 		return -EINVAL;
 	}
 
-	return regmap_bulk_write(chip->regmap, addr, val, len);
+	return regmap_bulk_write(map, addr, val, len);
 }
 
-static int pmi8998_masked_write(struct pmi8998_fg_chip *chip, u16 addr,
+static int pmi8998_masked_write(struct regmap *map, u16 addr,
 		u8 mask, u8 val)
 {
 	int error;
 	u8 reg;
-	error = pmi8998_read(chip, &reg, addr, 1);
+	error = pmi8998_read(map, &reg, addr, 1);
 	if (error)
 		return error;
 
 	reg &= ~mask;
 	reg |= val & mask;
 
-	error = pmi8998_write(chip, &reg, addr, 1);
+	error = pmi8998_write(map, &reg, addr, 1);
 	return error;
+}
+
+static int64_t twos_compliment_extend(int64_t val, int nbytes)
+{
+	int i;
+	int64_t mask;
+
+	mask = 0x80LL << ((nbytes - 1) * 8);
+	if (val & mask) {
+		for (i = 8; i > nbytes; i--) {
+			mask = 0xFFLL << ((i - 1) * 8);
+			val |= mask;
+		}
+	}
+	return val;
+}
+
+/*************************
+ * Battery Status RW
+ * ***********************/
+
+static int pmi8998_fg_get_capacity(struct pmi8998_fg_chip *chip, int *val)
+{
+	u8 cap[2];
+	int error = pmi8998_read(chip->regmap, cap, REG_BASE(chip) + BATT_MONOTONIC_SOC, 2);
+	if (error)
+		return error;
+	//choose lesser of two
+	if (cap[0] != cap[1]) {
+		dev_warn(chip->dev, "cap not same\n");
+		cap[0] = cap[0] < cap[1] ? cap[0] : cap[1];
+	}
+	*val = DIV_ROUND_CLOSEST((cap[0] - 1) * 98, 0xff - 2) + 1;
+	return 0;
+}
+
+//BATT_MISSING_STS BIT(6)
+static bool pmi8998_battery_missing(struct pmi8998_fg_chip *chip)
+{
+	int rc;
+	u8 fg_batt_sts;
+
+	rc = pmi8998_read(chip->regmap, &fg_batt_sts,
+				 INT_RT_STS(REG_BATT(chip)), 1);
+	if (rc) {
+		pr_warn("read read failed: addr=%03X, rc=%d\n",
+				INT_RT_STS(REG_BATT(chip)), rc);
+		return false;
+	}
+
+	// Bit 6 is set if the battery is missing
+	return (fg_batt_sts & BIT(6)) ? true : false;
+}
+
+static int fg_get_temperature(struct pmi8998_fg_chip *chip, int *val)
+{
+	int rc, temp;
+	u8 *readval = 0;
+
+	rc = pmi8998_read(chip->regmap, readval, REG_BATT(chip) + PARAM_ADDR_BATT_TEMP, 2);
+	if (rc) {
+		pr_err("failed to read temperature\n");
+		return rc;
+	}
+	temp = ((readval[1] & BATT_TEMP_MSB_MASK) << 8) |
+		(readval[0] & BATT_TEMP_LSB_MASK);
+	temp = DIV_ROUND_CLOSEST(temp * 10, 4);
+
+	*val = temp -2730;
+	return 0;
+}
+
+static int pmi8998_fg_get_current(struct pmi8998_fg_chip *chip, int *val)
+{
+	int rc, temp;
+	u8 *readval = 0;
+
+	rc = pmi8998_read(chip->regmap, readval, REG_BATT(chip) + PARAM_ADDR_BATT_CURRENT, 2);
+	if (rc) {
+		pr_err("failed to read current\n");
+		return rc;
+	}
+
+	temp = readval[1] << 8 | readval[0];
+	temp = twos_compliment_extend(temp, 2);
+	*val = div_s64((s64)temp * 488281,
+			1000);
+	return 0;
+}
+
+static int pmi8998_fg_get_voltage(struct pmi8998_fg_chip *chip, int *val)
+{
+	int rc, temp;
+	u8 *readval = 0;
+
+	rc = pmi8998_read(chip->regmap, readval, REG_BATT(chip) + PARAM_ADDR_BATT_CURRENT, 2);
+	if (rc) {
+		pr_err("failed to read current\n");
+		return rc;
+	}
+
+	temp = readval[1] << 8 | readval[0];
+	temp = twos_compliment_extend(temp, 2);
+	return div_s64((s64)temp * 488281,
+			1000);
 }
 
 /*************************
@@ -175,7 +199,7 @@ static int pmi8998_iacs_clear_sequence(struct pmi8998_fg_chip *chip)
 	u8 temp;
 
 	/* clear the error */
-	rc = pmi8998_masked_write(chip, chip->mem_base + MEM_INTF_IMA_CFG,
+	rc = pmi8998_masked_write(chip->regmap, REG_MEM(chip) + MEM_INTF_IMA_CFG,
 				BIT(2), BIT(2));
 	if (rc) {
 		pr_err("Error writing to IMA_CFG, rc=%d\n", rc);
@@ -183,26 +207,26 @@ static int pmi8998_iacs_clear_sequence(struct pmi8998_fg_chip *chip)
 	}
 
 	temp = 0x4;
-	rc = pmi8998_write(chip, &temp, chip->mem_base + MEM_INTF_ADDR_LSB + 1, 1);
+	rc = pmi8998_write(chip->regmap, &temp, REG_MEM(chip) + MEM_INTF_ADDR_LSB + 1, 1);
 	if (rc) {
 		pr_err("Error writing to MEM_INTF_ADDR_MSB, rc=%d\n", rc);
 		return rc;
 	}
 
 	temp = 0x0;
-	rc = pmi8998_write(chip, &temp, chip->mem_base + MEM_INTF_WR_DATA0 + 3, 1);
+	rc = pmi8998_write(chip->regmap, &temp, REG_MEM(chip) + MEM_INTF_WR_DATA0 + 3, 1);
 	if (rc) {
 		pr_err("Error writing to WR_DATA3, rc=%d\n", rc);
 		return rc;
 	}
 
-	rc = pmi8998_read(chip, &temp, chip->mem_base + MEM_INTF_RD_DATA0 + 3, 1);
+	rc = pmi8998_read(chip->regmap, &temp, REG_MEM(chip) + MEM_INTF_RD_DATA0 + 3, 1);
 	if (rc) {
 		pr_err("Error writing to RD_DATA3, rc=%d\n", rc);
 		return rc;
 	}
 
-	rc = pmi8998_masked_write(chip, chip->mem_base + MEM_INTF_IMA_CFG,
+	rc = pmi8998_masked_write(chip->regmap, REG_MEM(chip) + MEM_INTF_IMA_CFG,
 				BIT(2), 0);
 	if (rc) {
 		pr_err("Error writing to IMA_CFG, rc=%d\n", rc);
@@ -225,15 +249,15 @@ static int pmi8998_clear_ima(struct pmi8998_fg_chip *chip,
 	u8 err_sts = 0, exp_sts = 0, hw_sts = 0;
 	bool run_err_clr_seq = false;
 
-	rc = pmi8998_read(chip, &err_sts,
-			chip->mem_base + MEM_INTF_IMA_ERR_STS, 1);
+	rc = pmi8998_read(chip->regmap, &err_sts,
+			REG_MEM(chip) + MEM_INTF_IMA_ERR_STS, 1);
 	if (rc) {
 		dev_err(chip->dev, "failed to read IMA_ERR_STS, rc=%d\n", rc);
 		return rc;
 	}
 
-	rc = pmi8998_read(chip, &exp_sts,
-			chip->mem_base + MEM_INTF_IMA_EXP_STS, 1);
+	rc = pmi8998_read(chip->regmap, &exp_sts,
+			REG_MEM(chip) + MEM_INTF_IMA_EXP_STS, 1);
 	if (rc) {
 		dev_err(chip->dev, "Error in reading IMA_EXP_STS, rc=%d\n", rc);
 		return rc;
@@ -241,8 +265,8 @@ static int pmi8998_clear_ima(struct pmi8998_fg_chip *chip,
 
 
 	if (check_hw_sts) {
-		rc = pmi8998_read(chip, &hw_sts,
-				chip->mem_base + MEM_INTF_IMA_HW_STS, 1);
+		rc = pmi8998_read(chip->regmap, &hw_sts,
+				REG_MEM(chip) + MEM_INTF_IMA_HW_STS, 1);
 		if (rc) {
 			dev_err(chip->dev, "Error in reading IMA_HW_STS, rc=%d\n", rc);
 			return rc;
@@ -291,12 +315,145 @@ static int pmi8998_clear_ima(struct pmi8998_fg_chip *chip,
  * Init stuff
  * ******************/
 
-// static int pmi8998_battery_profile_init(struct pmi8998_fg_chip *chip)
-// {
+static int fg_get_property(struct power_supply *psy,
+		enum power_supply_property psp,
+		union power_supply_propval *val)
+{
+	struct pmi8998_fg_chip *chip = power_supply_get_drvdata(psy);
+	int error = 0, temp;
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_MANUFACTURER:
+		val->strval = "QCOM";
+		break;
+	case POWER_SUPPLY_PROP_MODEL_NAME:
+		val->strval = "PMI8998 Battery";
+		break;
+	case POWER_SUPPLY_PROP_TECHNOLOGY:
+		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
+		break;
+	case POWER_SUPPLY_PROP_CAPACITY:
+		error = pmi8998_fg_get_capacity(chip, &val->intval);
+		break;
+	case POWER_SUPPLY_PROP_CURRENT_NOW:
+		error = pmi8998_fg_get_current(chip, &val->intval);
+		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+		error = pmi8998_fg_get_voltage(chip, &val->intval);
+		break;
+	// case POWER_SUPPLY_PROP_VOLTAGE_OCV:
+	// 	error = fg_get_param(chip, FG_DATA_OCV, &val->intval);
+	// 	break;
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
+		val->intval = chip->batt_info.batt_max_voltage_uv;
+		break;
+	case POWER_SUPPLY_PROP_TEMP:
+		error = fg_get_temperature(chip, &val->intval);
+		break;
+	case POWER_SUPPLY_PROP_CYCLE_COUNT:
+		error = 10;
+		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
+		val->intval = 3370000; /* single-cell li-ion low end */
+		break;
+	// case POWER_SUPPLY_PROP_CHARGE_COUNTER:
+	// 	error = fg_get_param(chip, FG_DATA_CHARGE_COUNTER, &val->intval);
+	// 	break;
+	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
+		val->intval = chip->batt_info.nom_cap_uah;
+		break;
+	case POWER_SUPPLY_PROP_CHARGE_FULL:
+		val->intval = chip->learning_data.learned_cc_uah;
+		break;
+	case POWER_SUPPLY_PROP_CHARGE_NOW:
+		val->intval = chip->learning_data.cc_uah;
+		break;
+	// case POWER_SUPPLY_PROP_CHARGE_TERM_CURRENT:
+	// 	temp = chip->param[FG_SETTING_CHG_TERM_CURRENT].value * 1000;
+	// 	val->intval = temp;
+	// 	break;
+	case POWER_SUPPLY_PROP_STATUS:
+		val->intval = chip->status;
+		break;
+	case POWER_SUPPLY_PROP_HEALTH:
+		val->intval = POWER_SUPPLY_HEALTH_GOOD;
+		break;
+	default:
+		pr_err("invalid property: %d\n", psp);
+		return -EINVAL;
+	}
+	return error;
+}
+
+static const struct power_supply_desc bms_psy_desc = {
+	.name = "pmi8998-bms",
+	.type = POWER_SUPPLY_TYPE_BATTERY,
+	.properties = fg_properties,
+	.num_properties = ARRAY_SIZE(fg_properties),
+	.get_property = fg_get_property,
+	//.set_property = fg_set_property,
+	//.property_is_writeable = fg_writable_property,
+};
+
+
+// static int pmi8998_fg_of_battery_init(struct pmi8998_fg_chip *chip){
 // 	struct device_node *batt_node;
 // 	struct device_node *node = chip->dev->of_node;
 // 	int rc = 0, len = 0;
 // 	const char *data;
+//
+// 	batt_node = of_find_node_by_name(node, "qcom,battery-data");
+// 	if (!batt_node) {
+// 		pr_err("No available batterydata\n");
+// 		return rc;
+// 	}
+//
+// 	rc = of_property_read_u32(batt_node, "qcom,max-voltage-uv",
+// 					&chip->batt_info.batt_max_voltage_uv_design);
+//
+	// data = of_get_property(chip->dev->of_node,
+	// 		"qcom,thermal-coefficients", &len);
+	// if (data && ((len == 6 && chip->pmic_version == PMI8950) ||
+	// 		(len == 3 && chip->pmic_version != PMI8950))) {
+	// 	memcpy(chip->batt_info.thermal_coeffs, data, len);
+	// 	chip->param[FG_SETTING_THERMAL_COEFFS].length = len;
+	// }
+
+	// data = of_get_property(batt_node, "qcom,fg-profile-data", &len);
+	// if (!data) {
+	// 	pr_err("no battery profile loaded\n");
+	// 	return 0;
+	// }
+
+	// if ((chip->pmic_version == PMI8950 && len != FG_PROFILE_LEN_PMI8950) ||
+	// 	(chip->pmic_version == PMI8998_V1 && len != FG_PROFILE_LEN_PMI8998) ||
+	// 	(chip->pmic_version == PMI8998_V2 && len != FG_PROFILE_LEN_PMI8998)) {
+	// 	pr_err("battery profile incorrect size: %d\n", len);
+	// 	return -EINVAL;
+	// }
+
+	// chip->batt_info.batt_profile = devm_kzalloc(chip->dev,
+	// 		sizeof(char) * len, GFP_KERNEL);
+
+	// if (!chip->batt_info.batt_profile) {
+	// 	pr_err("coulnt't allocate mem for battery profile\n");
+	// 	rc = -ENOMEM;
+	// 	return rc;
+	// }
+
+	// if (!is_profile_load_required(chip))
+	// 	goto done;
+	// else
+	// 	pr_warn("profile load needs to be done, but not done!\n");
+//
+// done:
+// 	rc = fg_get_param(chip, FG_DATA_NOM_CAP, &chip->batt_info.nom_cap_uah);
+// 	if (rc) {
+// 		pr_err("Failed to read nominal capacitance: %d\n", rc);
+// 		return -EINVAL;
+// 	}
+//
+// 	return rc;
 // }
 
 static int pmi8998_fg_probe(struct platform_device *pdev)
@@ -322,41 +479,26 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	// Get base addresses
-
+	// Get base address
 	prop_addr = of_get_address(pdev->dev.of_node, 0, NULL, NULL);
 	if (!prop_addr) {
 		dev_err(chip->dev, "Couldn't read SOC base address from dt\n");
 		return -EINVAL;
 	}
-	chip->soc_base = be32_to_cpu(*prop_addr);
+	chip->base = be32_to_cpu(*prop_addr);
 
-	prop_addr = of_get_address(pdev->dev.of_node, 1, NULL, NULL);
-	if (!prop_addr) {
-		dev_err(chip->dev, "Couldn't read BATT base address from dt\n");
-		return -EINVAL;
-	}
-	chip->batt_base = be32_to_cpu(*prop_addr);
+	//chip->sram_params = pmi8998_sram_params_v2;
 
-	prop_addr = of_get_address(pdev->dev.of_node, 2, NULL, NULL);
-	if (!prop_addr) {
-		dev_err(chip->dev, "Couldn't read MEM base address from dts\n");
-		return -EINVAL;
-	}
-	chip->mem_base = be32_to_cpu(*prop_addr);
-
-	chip->sram_params = pmi8998_sram_params_v2;
-
-	// Init memif (chip hardware info)
-	rc = pmi8998_read(chip, chip->revision, chip->mem_base + DIG_MINOR, 4);
+	// Init memif fn inlined here (chip hardware info)
+	rc = pmi8998_read(chip->regmap, chip->revision, REG_MEM(chip) + DIG_MINOR, 4);
 	if (rc) {
 		dev_err(chip->dev, "Unable to read FG revision rc=%d\n", rc);
 		return rc;
 	}
 
-	dev_info(chip->dev, "pmi8998 revision DIG:%d.%d ANA:%d.%d\n",
-		chip->revision[DIG_MAJOR], chip->revision[DIG_MINOR],
-		chip->revision[ANA_MAJOR], chip->revision[ANA_MINOR]);
+	// dev_info(chip->dev, "pmi8998 revision DIG:%d.%d ANA:%d.%d\n",
+	// 	chip->revision[DIG_MAJOR], chip->revision[DIG_MINOR],
+	// 	chip->revision[ANA_MAJOR], chip->revision[ANA_MINOR]);
 	
 	/*
 	 * Change the FG_MEM_INT interrupt to track IACS_READY
@@ -364,8 +506,8 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	 * that the next transaction starts only after the hw is ready.
 	 * IACS_INTR_SRC_SLCT is BIT(3)
 	 */
-	rc = pmi8998_masked_write(chip,
-		chip->mem_base + MEM_INTF_IMA_CFG, BIT(3), BIT(3));
+	rc = pmi8998_masked_write(chip->regmap,
+		REG_MEM(chip) + MEM_INTF_IMA_CFG, BIT(3), BIT(3));
 	if (rc) {
 		dev_err(chip->dev,
 			"failed to configure interrupt source %d\n",
@@ -380,14 +522,14 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	}
 
 	// Check and clear DMA errors
-	rc = pmi8998_read(chip, &dma_status, chip->mem_base + 0x70, 1);
+	rc = pmi8998_read(chip->regmap, &dma_status, REG_MEM(chip) + 0x70, 1);
 	if (rc < 0) {
 		pr_err("failed to read dma_status, rc=%d\n", rc);
 		return rc;
 	}
 
 	error_present = dma_status & (BIT(1) | BIT(2));
-	rc = pmi8998_masked_write(chip, chip->mem_base + 0x71, BIT(0),
+	rc = pmi8998_masked_write(chip->regmap, REG_MEM(chip) + 0x71, BIT(0),
 			error_present ? BIT(0) : 0);
 	if (rc < 0) {
 		pr_err("failed to write dma_ctl, rc=%d\n", rc);
@@ -395,7 +537,9 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	}
 
 	// TODO: Init properties
-	dev_info(chip->dev, "NO ERRORS, reaches till here\n");
+	dev_info(chip->dev, "probed revision DIG:%d.%d ANA:%d.%d\n",
+		chip->revision[DIG_MAJOR], chip->revision[DIG_MINOR],
+		chip->revision[ANA_MAJOR], chip->revision[ANA_MINOR]);
 	//pmi8998_battery_profile_init(&chip);
 	//pmi8998_hw_init();
 	return 0;
