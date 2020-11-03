@@ -322,6 +322,8 @@ static int fg_get_property(struct power_supply *psy,
 	struct pmi8998_fg_chip *chip = power_supply_get_drvdata(psy);
 	int error = 0, temp;
 
+	dev_info(chip->dev, "Getting property: %d", psp);
+
 	switch (psp) {
 	case POWER_SUPPLY_PROP_MANUFACTURER:
 		val->strval = "QCOM";
@@ -333,17 +335,17 @@ static int fg_get_property(struct power_supply *psy,
 		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
-		error = pmi8998_fg_get_capacity(chip, &val->intval);
+		//error = pmi8998_fg_get_capacity(chip, &val->intval);
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
-		error = pmi8998_fg_get_current(chip, &val->intval);
+		//error = pmi8998_fg_get_current(chip, &val->intval);
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-		error = pmi8998_fg_get_voltage(chip, &val->intval);
+		//error = pmi8998_fg_get_voltage(chip, &val->intval);
 		break;
-	// case POWER_SUPPLY_PROP_VOLTAGE_OCV:
-	// 	error = fg_get_param(chip, FG_DATA_OCV, &val->intval);
-	// 	break;
+	case POWER_SUPPLY_PROP_VOLTAGE_OCV:
+		//error = fg_get_param(chip, FG_DATA_OCV, &val->intval);
+		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
 		val->intval = chip->batt_info.batt_max_voltage_uv;
 		break;
@@ -356,9 +358,9 @@ static int fg_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
 		val->intval = 3370000; /* single-cell li-ion low end */
 		break;
-	// case POWER_SUPPLY_PROP_CHARGE_COUNTER:
-	// 	error = fg_get_param(chip, FG_DATA_CHARGE_COUNTER, &val->intval);
-	// 	break;
+	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
+		//error = fg_get_param(chip, FG_DATA_CHARGE_COUNTER, &val->intval);
+		break;
 	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
 		val->intval = chip->batt_info.nom_cap_uah;
 		break;
@@ -396,7 +398,7 @@ static const struct power_supply_desc bms_psy_desc = {
 };
 
 
-// static int pmi8998_fg_of_battery_init(struct pmi8998_fg_chip *chip){
+// static int pmi8998_fg_of_battery_init(struct pmbms_psy_desci8998_fg_chip *chip){
 // 	struct device_node *batt_node;
 // 	struct device_node *node = chip->dev->of_node;
 // 	int rc = 0, len = 0;
@@ -458,7 +460,7 @@ static const struct power_supply_desc bms_psy_desc = {
 
 static int pmi8998_fg_probe(struct platform_device *pdev)
 {
-	// struct power_supply_config supply_config = {};
+	struct power_supply_config supply_config = {};
     struct pmi8998_fg_chip *chip;
 	const __be32 *prop_addr;
 	int rc = 0;
@@ -542,6 +544,18 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 		chip->revision[ANA_MAJOR], chip->revision[ANA_MINOR]);
 	//pmi8998_battery_profile_init(&chip);
 	//pmi8998_hw_init();
+
+	supply_config.drv_data = chip;
+	supply_config.of_node = pdev->dev.of_node;
+
+	chip->bms_psy = devm_power_supply_register(chip->dev,
+			&bms_psy_desc, &supply_config);
+	if (IS_ERR(chip->bms_psy)) {
+		dev_err(&pdev->dev, "failed to register battery\n");
+		return PTR_ERR(chip->bms_psy);
+	}
+
+	platform_set_drvdata(pdev, chip);
 	return 0;
 }
 

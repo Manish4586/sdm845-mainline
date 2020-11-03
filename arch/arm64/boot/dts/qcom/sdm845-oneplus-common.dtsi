@@ -626,6 +626,20 @@
 	status = "okay";
 };
 
+/* Whilst this IS the correct driver, battery status
+ * reporting is completely wrong, keep it disabled for now
+ */
+&i2c10 {
+		status = "okay";
+		clock-frequency = <100000>;
+
+		bq27411_battery: bq27411-battery@55 {
+				status = "okay";
+				compatible = "ti,BQ27411";
+				reg = <0x55>;
+		};
+};
+
 &i2c12 {
 	status = "okay";
 	clock-frequency = <400000>;

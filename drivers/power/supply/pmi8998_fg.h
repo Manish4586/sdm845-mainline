@@ -40,7 +40,7 @@
 #define INT_EN_CLR(base)			(base + 0x16)
 
 // Param addresses
-#define PARAM_ADDR_BATT_TEMP		0x550
+#define PARAM_ADDR_BATT_TEMP		0x50
 #define PARAM_ADDR_BATT_VOLTAGE		0xa0
 #define PARAM_ADDR_BATT_CURRENT		0xa2
 
