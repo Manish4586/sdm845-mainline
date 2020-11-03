@@ -148,6 +148,7 @@ struct csid_device {
 	struct v4l2_subdev subdev;
 	struct media_pad pads[MSM_CSID_PADS_NUM];
 	void __iomem *base;
+	resource_size_t base_unmapped;
 	u32 irq;
 	char irq_name[30];
 	struct camss_clock *clock;

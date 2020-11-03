@@ -131,6 +131,7 @@ struct vfe_device {
 	struct camss *camss;
 	u8 id;
 	void __iomem *base;
+	resource_size_t base_unmapped;
 	u32 irq;
 	char irq_name[30];
 	struct camss_clock *clock;

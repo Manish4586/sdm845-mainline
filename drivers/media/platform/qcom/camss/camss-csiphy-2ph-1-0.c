@@ -9,6 +9,7 @@
  */
 
 #include "camss-csiphy.h"
+#include "camss-video.h"
 
 #include <linux/delay.h>
 #include <linux/interrupt.h>
@@ -41,9 +42,9 @@ static void csiphy_hw_version_read(struct csiphy_device *csiphy,
  */
 static void csiphy_reset(struct csiphy_device *csiphy)
 {
-	writel_relaxed(0x1, csiphy->base + CAMSS_CSI_PHY_GLBL_RESET);
+	debug_writel(0x1, csiphy->base + CAMSS_CSI_PHY_GLBL_RESET, csiphy->base_unmapped, csiphy->base);
 	usleep_range(5000, 8000);
-	writel_relaxed(0x0, csiphy->base + CAMSS_CSI_PHY_GLBL_RESET);
+	debug_writel(0x0, csiphy->base + CAMSS_CSI_PHY_GLBL_RESET, csiphy->base_unmapped, csiphy->base);
 }
 
 /*
@@ -91,17 +92,15 @@ static void csiphy_lanes_enable(struct csiphy_device *csiphy,
 
 	settle_cnt = csiphy_settle_cnt_calc(link_freq, csiphy->timer_clk_rate);
 
-	writel_relaxed(0x1, csiphy->base +
-		       CAMSS_CSI_PHY_GLBL_T_INIT_CFG0);
-	writel_relaxed(0x1, csiphy->base +
-		       CAMSS_CSI_PHY_T_WAKEUP_CFG0);
+	debug_writel(0x1, csiphy->base + CAMSS_CSI_PHY_GLBL_T_INIT_CFG0,csiphy->base_unmapped, csiphy->base);
+	debug_writel(0x1, csiphy->base + CAMSS_CSI_PHY_T_WAKEUP_CFG0, csiphy->base_unmapped, csiphy->base);
 
 	val = 0x1;
 	val |= lane_mask << 1;
-	writel_relaxed(val, csiphy->base + CAMSS_CSI_PHY_GLBL_PWR_CFG);
+	debug_writel(val, csiphy->base + CAMSS_CSI_PHY_GLBL_PWR_CFG, csiphy->base_unmapped, csiphy->base);
 
 	val = cfg->combo_mode << 4;
-	writel_relaxed(val, csiphy->base + CAMSS_CSI_PHY_GLBL_RESET);
+	debug_writel(val, csiphy->base + CAMSS_CSI_PHY_GLBL_RESET, csiphy->base_unmapped, csiphy->base);
 
 	for (i = 0; i <= c->num_data; i++) {
 		if (i == c->num_data)
@@ -109,14 +108,10 @@ static void csiphy_lanes_enable(struct csiphy_device *csiphy,
 		else
 			l = c->data[i].pos;
 
-		writel_relaxed(0x10, csiphy->base +
-			       CAMSS_CSI_PHY_LNn_CFG2(l));
-		writel_relaxed(settle_cnt, csiphy->base +
-			       CAMSS_CSI_PHY_LNn_CFG3(l));
-		writel_relaxed(0x3f, csiphy->base +
-			       CAMSS_CSI_PHY_INTERRUPT_MASKn(l));
-		writel_relaxed(0x3f, csiphy->base +
-			       CAMSS_CSI_PHY_INTERRUPT_CLEARn(l));
+		debug_writel(0x10, csiphy->base + CAMSS_CSI_PHY_LNn_CFG2(l), csiphy->base_unmapped, csiphy->base);
+		debug_writel(settle_cnt, csiphy->base + CAMSS_CSI_PHY_LNn_CFG3(l), csiphy->base_unmapped, csiphy->base);
+		debug_writel(0x3f, csiphy->base + CAMSS_CSI_PHY_INTERRUPT_MASKn(l), csiphy->base_unmapped, csiphy->base);
+		debug_writel(0x3f, csiphy->base + CAMSS_CSI_PHY_INTERRUPT_CLEARn(l), csiphy->base_unmapped, csiphy->base);
 	}
 }
 
@@ -133,11 +128,10 @@ static void csiphy_lanes_disable(struct csiphy_device *csiphy,
 		else
 			l = c->data[i].pos;
 
-		writel_relaxed(0x0, csiphy->base +
-			       CAMSS_CSI_PHY_LNn_CFG2(l));
+		debug_writel(0x0, csiphy->base + CAMSS_CSI_PHY_LNn_CFG2(l), csiphy->base_unmapped, csiphy->base);
 	}
 
-	writel_relaxed(0x0, csiphy->base + CAMSS_CSI_PHY_GLBL_PWR_CFG);
+	debug_writel(0x0, csiphy->base + CAMSS_CSI_PHY_GLBL_PWR_CFG, csiphy->base_unmapped, csiphy->base);
 }
 
 /*
@@ -155,12 +149,10 @@ static irqreturn_t csiphy_isr(int irq, void *dev)
 	for (i = 0; i < 8; i++) {
 		u8 val = readl_relaxed(csiphy->base +
 				       CAMSS_CSI_PHY_INTERRUPT_STATUSn(i));
-		writel_relaxed(val, csiphy->base +
-			       CAMSS_CSI_PHY_INTERRUPT_CLEARn(i));
-		writel_relaxed(0x1, csiphy->base + CAMSS_CSI_PHY_GLBL_IRQ_CMD);
-		writel_relaxed(0x0, csiphy->base + CAMSS_CSI_PHY_GLBL_IRQ_CMD);
-		writel_relaxed(0x0, csiphy->base +
-			       CAMSS_CSI_PHY_INTERRUPT_CLEARn(i));
+		debug_writel(val, csiphy->base + CAMSS_CSI_PHY_INTERRUPT_CLEARn(i), csiphy->base_unmapped, csiphy->base);
+		debug_writel(0x1, csiphy->base + CAMSS_CSI_PHY_GLBL_IRQ_CMD, csiphy->base_unmapped, csiphy->base);
+		debug_writel(0x0, csiphy->base + CAMSS_CSI_PHY_GLBL_IRQ_CMD, csiphy->base_unmapped, csiphy->base);
+		debug_writel(0x0, csiphy->base + CAMSS_CSI_PHY_INTERRUPT_CLEARn(i), csiphy->base_unmapped, csiphy->base);
 	}
 
 	return IRQ_HANDLED;

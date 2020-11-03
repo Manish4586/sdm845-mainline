@@ -192,14 +192,14 @@ static inline void vfe_reg_clr(struct vfe_device *vfe, u32 reg, u32 clr_bits)
 {
 	u32 bits = readl_relaxed(vfe->base + reg);
 
-	writel_relaxed(bits & ~clr_bits, vfe->base + reg);
+	debug_writel(bits & ~clr_bits, vfe->base + reg, vfe->base_unmapped, vfe->base);
 }
 
 static inline void vfe_reg_set(struct vfe_device *vfe, u32 reg, u32 set_bits)
 {
 	u32 bits = readl_relaxed(vfe->base + reg);
 
-	writel_relaxed(bits | set_bits, vfe->base + reg);
+	debug_writel(bits | set_bits, vfe->base + reg, vfe->base_unmapped, vfe->base);
 }
 
 static void vfe_global_reset(struct vfe_device *vfe)
@@ -216,12 +216,9 @@ static void vfe_global_reset(struct vfe_device *vfe)
 			 GLOBAL_RESET_CMD_RDI1		|
 			 GLOBAL_RESET_CMD_RDI2;
 
-	writel_relaxed(BIT(31), vfe->base + VFE_IRQ_MASK_0);
-
-	/* Make sure IRQ mask has been written before resetting */
+	debug_writel(BIT(31), vfe->base + VFE_IRQ_MASK_0, vfe->base_unmapped, vfe->base);
 	wmb();
-
-	writel_relaxed(reset_bits, vfe->base + VFE_GLOBAL_RESET_CMD);
+	debug_writel(reset_bits, vfe->base + VFE_GLOBAL_RESET_CMD, vfe->base_unmapped, vfe->base);
 }
 
 static void vfe_wm_start(struct vfe_device *vfe, u8 wm, struct vfe_line *line)
@@ -231,46 +228,64 @@ static void vfe_wm_start(struct vfe_device *vfe, u8 wm, struct vfe_line *line)
 	/*Set Debug Registers*/
 	val = DEBUG_STATUS_CFG_STATUS0(1) |
 	      DEBUG_STATUS_CFG_STATUS0(7);
-	writel_relaxed(val, vfe->base + VFE_BUS_WM_DEBUG_STATUS_CFG);
+	debug_writel(val, vfe->base + VFE_BUS_WM_DEBUG_STATUS_CFG, vfe->base_unmapped, vfe->base);
 
 	/* BUS_WM_INPUT_IF_ADDR_SYNC_FRAME_HEADER */
-	writel_relaxed(0, vfe->base + VFE_BUS_WM_ADDR_SYNC_FRAME_HEADER);
+	debug_writel(0, vfe->base + VFE_BUS_WM_ADDR_SYNC_FRAME_HEADER, vfe->base_unmapped, vfe->base);
+
 
 	/* no clock gating at bus input */
 	val = WM_CGC_OVERRIDE_ALL;
-	writel_relaxed(val, vfe->base + VFE_BUS_WM_CGC_OVERRIDE);
+	debug_writel(val, vfe->base + VFE_BUS_WM_CGC_OVERRIDE, vfe->base_unmapped, vfe->base);
 
-	writel_relaxed(0x0, vfe->base + VFE_BUS_WM_TEST_BUS_CTRL);
+	debug_writel(0x0, vfe->base + VFE_BUS_WM_TEST_BUS_CTRL, vfe->base_unmapped, vfe->base);
 
 	/* if addr_no_sync has default value then config the addr no sync reg */
 	val = WM_ADDR_NO_SYNC_DEFAULT_VAL;
-	writel_relaxed(val, vfe->base + VFE_BUS_WM_ADDR_SYNC_NO_SYNC);
+	debug_writel(val, vfe->base + VFE_BUS_WM_ADDR_SYNC_NO_SYNC, vfe->base_unmapped, vfe->base);
 
-	writel_relaxed(0xf, vfe->base + VFE_BUS_WM_BURST_LIMIT(wm));
+	debug_writel(0xf, vfe->base + VFE_BUS_WM_BURST_LIMIT(wm), vfe->base_unmapped, vfe->base);
 
 	val = WM_BUFFER_DEFAULT_WIDTH;
-	writel_relaxed(val, vfe->base + VFE_BUS_WM_BUFFER_WIDTH_CFG(wm));
+	printk("\n%s VFE_BUS_WM_BUFFER_WIDTH_CFG\n", __func__);
+	printk("%s 0:31  WIDTH: 0x%X\n", __func__, val);
+	debug_writel(val, vfe->base + VFE_BUS_WM_BUFFER_WIDTH_CFG(wm), vfe->base_unmapped, vfe->base);
 
 	val = 0;
-	writel_relaxed(val, vfe->base + VFE_BUS_WM_BUFFER_HEIGHT_CFG(wm));
+	printk("\n%s VFE_BUS_WM_BUFFER_HEIGHT_CFG\n", __func__);
+	printk("%s 0:15  HEIGHT: 0x%X\n", __func__, val);
+	debug_writel(val, vfe->base + VFE_BUS_WM_BUFFER_HEIGHT_CFG(wm), vfe->base_unmapped, vfe->base);
 
 	val = 0;
-	writel_relaxed(val, vfe->base + VFE_BUS_WM_PACKER_CFG(wm)); // XXX 1 for PLAIN8?
+	printk("\n%s VFE_BUS_WM_PACKER_CFG\n", __func__);
+	printk("%s 0:3  PACKER_CFG_MODE: %u\n", __func__, val);
+	printk("%s 4    PACKER_CFG_ALIGNMENT: %u\n", __func__, val);
+	debug_writel(val, vfe->base + VFE_BUS_WM_PACKER_CFG(wm), vfe->base_unmapped, vfe->base); // XXX 1 for PLAIN8?
 
 	/* Configure stride for RDIs */
 	val = WM_STRIDE_DEFAULT_STRIDE;
-	writel_relaxed(val, vfe->base + VFE_BUS_WM_STRIDE(wm));
+	printk("\n%s VFE_BUS_WM_STRIDE\n", __func__);
+	printk("%s 0:20 WR_STRIDE: %u\n", __func__, val);
+	debug_writel(val, vfe->base + VFE_BUS_WM_STRIDE(wm), vfe->base_unmapped, vfe->base);
 
 	/* Enable WM */
 	val = 1 << WM_CFG_EN |
 	      MODE_MIPI_RAW << WM_CFG_MODE;
-	writel_relaxed(val, vfe->base + VFE_BUS_WM_CFG(wm));
+	printk("\n%s VFE_BUS_WM_CFG\n", __func__);
+	printk("%s 0 EN: %u\n", __func__, val & 0x1);
+	printk("%s 1 MODE: %u\n", __func__, val >> 1 & 0x1);
+	printk("%s 2 VIRTUALFRAME: %u\n", __func__, val >> 2 & 0x1);
+	debug_writel(val, vfe->base + VFE_BUS_WM_CFG(wm), vfe->base_unmapped, vfe->base);
 }
 
 static void vfe_wm_stop(struct vfe_device *vfe, u8 wm)
 {
 	/* Disable WM */
-	writel_relaxed(0, vfe->base + VFE_BUS_WM_CFG(wm));
+	printk("\n%s VFE_BUS_WM_CFG#%u\n", __func__, wm);
+	printk("%s 0 EN: %u\n", __func__, 0);
+	printk("%s 1 MODE: %u\n", __func__, 0);
+	printk("%s 2 VIRTUALFRAME: %u\n", __func__, 0);
+	debug_writel(0, vfe->base + VFE_BUS_WM_CFG(wm), vfe->base_unmapped, vfe->base);
 }
 
 static void vfe_wm_update(struct vfe_device *vfe, u8 wm, u32 addr,
@@ -280,8 +295,15 @@ static void vfe_wm_update(struct vfe_device *vfe, u8 wm, u32 addr,
 		&line->video_out.active_fmt.fmt.pix_mp;
 	u32 stride = pix->plane_fmt[0].bytesperline;
 
-	writel_relaxed(addr, vfe->base + VFE_BUS_WM_IMAGE_ADDR(wm));
-	writel_relaxed(stride * pix->height, vfe->base + VFE_BUS_WM_FRAME_INC(wm));
+	printk("\n%s VFE_BUS_WM_IMAGE_ADDR#%u\n", __func__, wm);
+	printk("%s 0:31 ADDR: %u\n", __func__, addr);
+	debug_writel(addr, vfe->base + VFE_BUS_WM_IMAGE_ADDR(wm), vfe->base_unmapped, vfe->base);
+
+	printk("\n%s VFE_BUS_WM_FRAME_INC#%u\n", __func__, wm);
+	printk("%s 0:31 OFFSET: %u\n", __func__, stride * pix->height);
+	debug_writel(stride * pix->height, vfe->base + VFE_BUS_WM_FRAME_INC(wm), vfe->base_unmapped, vfe->base);
+
+	/* XXX enable wm ? */
 }
 
 static void vfe_reg_update(struct vfe_device *vfe, enum vfe_line_id line_id)
@@ -290,8 +312,7 @@ static void vfe_reg_update(struct vfe_device *vfe, enum vfe_line_id line_id)
 
 	/* Enforce ordering between previous reg writes and reg update */
 	wmb();
-
-	writel_relaxed(vfe->reg_update, vfe->base + VFE_REG_UPDATE_CMD);
+	debug_writel(vfe->reg_update, vfe->base + VFE_REG_UPDATE_CMD, vfe->base_unmapped, vfe->base);
 
 	/* Enforce ordering between reg update and subsequent reg writes */
 	wmb();
@@ -323,12 +344,12 @@ static void vfe_isr_read(struct vfe_device *vfe, u32 *status0, u32 *status1)
 	*status0 = readl_relaxed(vfe->base + VFE_IRQ_STATUS_0);
 	*status1 = readl_relaxed(vfe->base + VFE_IRQ_STATUS_1);
 
-	writel_relaxed(*status0, vfe->base + VFE_IRQ_CLEAR_0);
-	writel_relaxed(*status1, vfe->base + VFE_IRQ_CLEAR_1);
+	debug_writel(*status0, vfe->base + VFE_IRQ_CLEAR_0, vfe->base_unmapped, vfe->base);
+	debug_writel(*status1, vfe->base + VFE_IRQ_CLEAR_1, vfe->base_unmapped, vfe->base);
 
 	/* Enforce ordering between IRQ Clear and Global IRQ Clear */
 	wmb();
-	writel_relaxed(CMD_GLOBAL_CLEAR, vfe->base + VFE_IRQ_CMD);
+	debug_writel(CMD_GLOBAL_CLEAR, vfe->base + VFE_IRQ_CMD, vfe->base_unmapped, vfe->base);
 }
 
 static void vfe_violation_read(struct vfe_device *vfe)
@@ -354,19 +375,22 @@ static irqreturn_t vfe_isr(int irq, void *dev)
 	status0 = readl_relaxed(vfe->base + VFE_IRQ_STATUS_0);
 	status1 = readl_relaxed(vfe->base + VFE_IRQ_STATUS_1);
 
-	writel_relaxed(status0, vfe->base + VFE_IRQ_CLEAR_0);
-	writel_relaxed(status1, vfe->base + VFE_IRQ_CLEAR_1);
+	trace_printk("VFE: status0 = 0x%08x, status1 = 0x%08x\n",
+		     status0, status1);
+
+	debug_writel(status0, vfe->base + VFE_IRQ_CLEAR_0, vfe->base_unmapped, vfe->base);
+	debug_writel(status1, vfe->base + VFE_IRQ_CLEAR_1, vfe->base_unmapped, vfe->base);
 
 	for (i = VFE_LINE_RDI0; i <= VFE_LINE_RDI2; i++) {
 		vfe_bus_status[i] = readl_relaxed(vfe->base + VFE_BUS_IRQ_STATUS(i));
-		writel_relaxed(vfe_bus_status[i], vfe->base + VFE_BUS_IRQ_CLEAR(i));
+		debug_writel(vfe_bus_status[i], vfe->base + VFE_BUS_IRQ_CLEAR(i), vfe->base_unmapped, vfe->base);
 	}
 
 	/* Enforce ordering between IRQ reading and interpretation */
 	wmb();
 
-	writel_relaxed(CMD_GLOBAL_CLEAR, vfe->base + VFE_IRQ_CMD);
-	writel_relaxed(1, vfe->base + VFE_BUS_IRQ_CLEAR_GLOBAL);
+	debug_writel(CMD_GLOBAL_CLEAR, vfe->base + VFE_IRQ_CMD, vfe->base_unmapped, vfe->base);
+	debug_writel(1, vfe->base + VFE_BUS_IRQ_CLEAR_GLOBAL, vfe->base_unmapped, vfe->base);
 
 	if (status0 & STATUS_0_RESET_ACK)
 		vfe->isr_ops.reset_ack(vfe);

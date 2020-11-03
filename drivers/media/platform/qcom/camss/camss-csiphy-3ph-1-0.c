@@ -172,9 +172,9 @@ static void csiphy_hw_version_read(struct csiphy_device *csiphy,
  */
 static void csiphy_reset(struct csiphy_device *csiphy)
 {
-	writel_relaxed(0x1, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(0));
+	debug_writel(0x1, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(0), csiphy->base_unmapped, csiphy->base);
 	usleep_range(5000, 8000);
-	writel_relaxed(0x0, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(0));
+	debug_writel(0x0, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(0), csiphy->base_unmapped, csiphy->base);
 }
 
 static irqreturn_t csiphy_isr(int irq, void *dev)
@@ -191,8 +191,8 @@ static irqreturn_t csiphy_isr(int irq, void *dev)
 				    CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(c));
 	}
 
-	writel_relaxed(0x1, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(10));
-	writel_relaxed(0x0, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(10));
+	debug_writel(0x1, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(10), csiphy->base_unmapped, csiphy->base);
+	debug_writel(0x0, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(10), csiphy->base_unmapped, csiphy->base);
 
 	for (i = 22; i < 33; i++)
 		writel_relaxed(0x0, csiphy->base +
@@ -249,50 +249,49 @@ static void csiphy_gen1_config_lanes(struct csiphy_device *csiphy,
 
 		val = CSIPHY_3PH_LNn_CFG1_SWI_REC_DLY_PRG;
 		val |= 0x17;
-		writel_relaxed(val, csiphy->base + CSIPHY_3PH_LNn_CFG1(l));
+		debug_writel(val, csiphy->base + CSIPHY_3PH_LNn_CFG1(l), csiphy->base_unmapped, csiphy->base);
 
 		val = CSIPHY_3PH_LNn_CFG2_LP_REC_EN_INT;
-		writel_relaxed(val, csiphy->base + CSIPHY_3PH_LNn_CFG2(l));
+		debug_writel(val, csiphy->base + CSIPHY_3PH_LNn_CFG2(l), csiphy->base_unmapped, csiphy->base);
 
 		val = settle_cnt;
-		writel_relaxed(val, csiphy->base + CSIPHY_3PH_LNn_CFG3(l));
+		debug_writel(val, csiphy->base + CSIPHY_3PH_LNn_CFG3(l), csiphy->base_unmapped, csiphy->base);
 
 		val = CSIPHY_3PH_LNn_CFG5_T_HS_DTERM |
 			CSIPHY_3PH_LNn_CFG5_HS_REC_EQ_FQ_INT;
-		writel_relaxed(val, csiphy->base + CSIPHY_3PH_LNn_CFG5(l));
+		debug_writel(val, csiphy->base + CSIPHY_3PH_LNn_CFG5(l), csiphy->base_unmapped, csiphy->base);
 
 		val = CSIPHY_3PH_LNn_CFG6_SWI_FORCE_INIT_EXIT;
-		writel_relaxed(val, csiphy->base + CSIPHY_3PH_LNn_CFG6(l));
+		debug_writel(val, csiphy->base + CSIPHY_3PH_LNn_CFG6(l), csiphy->base_unmapped, csiphy->base);
 
 		val = CSIPHY_3PH_LNn_CFG7_SWI_T_INIT;
-		writel_relaxed(val, csiphy->base + CSIPHY_3PH_LNn_CFG7(l));
+		debug_writel(val, csiphy->base + CSIPHY_3PH_LNn_CFG7(l), csiphy->base_unmapped, csiphy->base);
 
 		val = CSIPHY_3PH_LNn_CFG8_SWI_SKIP_WAKEUP |
 			CSIPHY_3PH_LNn_CFG8_SKEW_FILTER_ENABLE;
-		writel_relaxed(val, csiphy->base + CSIPHY_3PH_LNn_CFG8(l));
+		debug_writel(val, csiphy->base + CSIPHY_3PH_LNn_CFG8(l), csiphy->base_unmapped, csiphy->base);
 
 		val = CSIPHY_3PH_LNn_CFG9_SWI_T_WAKEUP;
-		writel_relaxed(val, csiphy->base + CSIPHY_3PH_LNn_CFG9(l));
+		debug_writel(val, csiphy->base + CSIPHY_3PH_LNn_CFG9(l), csiphy->base_unmapped, csiphy->base);
 
 		val = CSIPHY_3PH_LNn_TEST_IMP_HS_TERM_IMP;
-		writel_relaxed(val, csiphy->base + CSIPHY_3PH_LNn_TEST_IMP(l));
+		debug_writel(val, csiphy->base + CSIPHY_3PH_LNn_TEST_IMP(l), csiphy->base_unmapped, csiphy->base);
 
 		val = CSIPHY_3PH_LNn_CSI_LANE_CTRL15_SWI_SOT_SYMBOL;
-		writel_relaxed(val, csiphy->base +
-				    CSIPHY_3PH_LNn_CSI_LANE_CTRL15(l));
+		debug_writel(val, csiphy->base + CSIPHY_3PH_LNn_CSI_LANE_CTRL15(l), csiphy->base_unmapped, csiphy->base);
 	}
 
 	val = CSIPHY_3PH_LNn_CFG1_SWI_REC_DLY_PRG;
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_LNn_CFG1(l));
+	debug_writel(val, csiphy->base + CSIPHY_3PH_LNn_CFG1(l), csiphy->base_unmapped, csiphy->base);
 
 	if (csiphy->camss->version == CAMSS_660)
 		val = CSIPHY_3PH_LNn_CFG4_T_HS_CLK_MISS_660;
 	else
 		val = CSIPHY_3PH_LNn_CFG4_T_HS_CLK_MISS;
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_LNn_CFG4(l));
+	debug_writel(val, csiphy->base + CSIPHY_3PH_LNn_CFG4(l), csiphy->base_unmapped, csiphy->base);
 
 	val = CSIPHY_3PH_LNn_MISC1_IS_CLKLANE;
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_LNn_MISC1(l));
+	debug_writel(val, csiphy->base + CSIPHY_3PH_LNn_MISC1(l), csiphy->base_unmapped, csiphy->base);
 }
 
 static void csiphy_gen2_config_lanes(struct csiphy_device *csiphy,
@@ -315,7 +314,7 @@ static void csiphy_gen2_config_lanes(struct csiphy_device *csiphy,
 				val = r->reg_data;
 				break;
 			}
-			writel_relaxed(val, csiphy->base + r->reg_addr);
+			debug_writel(val, csiphy->base + r->reg_addr, csiphy->base_unmapped, csiphy->base);
 		}
 	}
 }
@@ -335,16 +334,17 @@ static void csiphy_lanes_enable(struct csiphy_device *csiphy,
 	for (i = 0; i < c->num_data; i++)
 		val |= BIT(c->data[i].pos * 2);
 
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(5));
+	//val = 0xd5;
+	debug_writel(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(5), csiphy->base_unmapped, csiphy->base);
 
-	val = CSIPHY_3PH_CMN_CSI_COMMON_CTRL6_COMMON_PWRDN_B;
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(6));
+	val = 1; // val = CSIPHY_3PH_CMN_CSI_COMMON_CTRL6_COMMON_PWRDN_B;
+	debug_writel(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(6), csiphy->base_unmapped, csiphy->base);
 
 	val = 0x02;
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(7));
+	debug_writel(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(7), csiphy->base_unmapped, csiphy->base);
 
 	val = 0x00;
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(0));
+	debug_writel(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(0), csiphy->base_unmapped, csiphy->base);
 
 	if (csiphy->camss->version == CAMSS_8x16 ||
 	    csiphy->camss->version == CAMSS_8x96)
@@ -353,47 +353,47 @@ static void csiphy_lanes_enable(struct csiphy_device *csiphy,
 		csiphy_gen2_config_lanes(csiphy, settle_cnt);
 
 	val = 0xff;
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(11));
+	debug_writel(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(11), csiphy->base_unmapped, csiphy->base);
 
 	val = 0xff;
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(12));
+	debug_writel(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(12), csiphy->base_unmapped, csiphy->base);
 
 	val = 0xfb;
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(13));
+	debug_writel(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(13), csiphy->base_unmapped, csiphy->base);
 
 	val = 0xff;
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(14));
+	debug_writel(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(14), csiphy->base_unmapped, csiphy->base);
 
 	val = 0x7f;
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(15));
+	debug_writel(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(15), csiphy->base_unmapped, csiphy->base);
 
 	val = 0xff;
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(16));
+	debug_writel(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(16), csiphy->base_unmapped, csiphy->base);
 
 	val = 0xff;
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(17));
+	debug_writel(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(17), csiphy->base_unmapped, csiphy->base);
 
 	val = 0xef;
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(18));
+	debug_writel(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(18), csiphy->base_unmapped, csiphy->base);
 
 	val = 0xff;
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(19));
+	debug_writel(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(19), csiphy->base_unmapped, csiphy->base);
 
 	val = 0xff;
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(20));
+	debug_writel(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(20), csiphy->base_unmapped, csiphy->base);
 
 	val = 0xff;
-	writel_relaxed(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(21));
+	debug_writel(val, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(21), csiphy->base_unmapped, csiphy->base);
 }
 
 static void csiphy_lanes_disable(struct csiphy_device *csiphy,
 				 struct csiphy_config *cfg)
 {
-	writel_relaxed(0, csiphy->base +
-			  CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(5));
+	debug_writel(0, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(5),
+			  csiphy->base_unmapped, csiphy->base);
 
-	writel_relaxed(0, csiphy->base +
-			  CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(6));
+	debug_writel(0, csiphy->base + CSIPHY_3PH_CMN_CSI_COMMON_CTRLn(6),
+		      csiphy->base_unmapped, csiphy->base);
 }
 
 const struct csiphy_hw_ops csiphy_ops_3ph_1_0 = {

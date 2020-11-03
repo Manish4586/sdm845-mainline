@@ -569,10 +569,11 @@ int msm_csid_subdev_init(struct camss *camss, struct csid_device *csid,
 	csid->ops->subdev_init(csid);
 
 	/* Memory */
-
 	csid->base = devm_platform_ioremap_resource_byname(pdev, res->reg[0]);
-	if (IS_ERR(csid->base))
+	if (IS_ERR(csid->base)) {
+		dev_err(dev, "could not map memory\n");
 		return PTR_ERR(csid->base);
+	}
 
 	/* Interrupt */
 

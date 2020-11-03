@@ -10,6 +10,8 @@
 #ifndef QC_MSM_CAMSS_CSIPHY_H
 #define QC_MSM_CAMSS_CSIPHY_H
 
+#include "camss-video.h"
+
 #include <linux/clk.h>
 #include <linux/interrupt.h>
 #include <media/media-entity.h>
@@ -62,6 +64,7 @@ struct csiphy_device {
 	struct v4l2_subdev subdev;
 	struct media_pad pads[MSM_CSIPHY_PADS_NUM];
 	void __iomem *base;
+	resource_size_t base_unmapped;
 	void __iomem *base_clk_mux;
 	u32 irq;
 	char irq_name[30];

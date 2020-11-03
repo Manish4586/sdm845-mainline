@@ -356,29 +356,52 @@ static void csid_configure_stream(struct csid_device *csid, u8 enable)
 			val = vc << TPG_VC_CFG0_VC_NUM;
 			val |= INTELEAVING_MODE_ONE_SHOT << TPG_VC_CFG0_LINE_INTERLEAVING_MODE;
 			val |= 0 << TPG_VC_CFG0_NUM_FRAMES;
-			writel_relaxed(val, csid->base + CSID_TPG_VC_CFG0);
+			printk("\n%s CAMSS_CSID_TG_VC_CFG0\n", __func__);
+			printk("%s 0:3   VC_NUM: %u\n", __func__, val & 0xF);
+			printk("%s 8:9   NUM_ACTIVE_DTS: %u\n", __func__, (val & (0x3 << 8)) >> 8);
+			printk("%s 10    LINE_INTERLEAVING_MODE: %u\n", __func__, (val & (0x1 << 10)) >> 10);
+			printk("%s 16:23 NUM_FRAMES: %u\n", __func__, (val & (0xFF << 16)) >> 16);
+			debug_writel(val, csid->base + CSID_TPG_VC_CFG0, csid->base_unmapped, csid->base);
 
 			val = 0x740 << TPG_VC_CFG1_H_BLANKING_COUNT;
 			val |= 0x3ff << TPG_VC_CFG1_V_BLANKING_COUNT;
-			writel_relaxed(val, csid->base + CSID_TPG_VC_CFG1);
+			printk("\n%s CAMSS_CSID_TG_VC_CFG1\n", __func__);
+			printk("%s 0:10  H_BLANKINK_COUNT: %u\n", __func__, val & 0x7FF);
+			printk("%s 12:21 NUM_ACTIVE_DTS: %u\n", __func__, (val & (0x3FF << 12)) >> 12);
+			printk("%s 24:25 LINE_INTERLEAVING_MODE: %u\n", __func__, (val & (0x3 << 24)) >> 24);
+			debug_writel(val, csid->base + CSID_TPG_VC_CFG1, csid->base_unmapped, csid->base);
 
-			writel_relaxed(0x12345678, csid->base + CSID_TPG_LFSR_SEED);
+			// CAMSS_CSID_TG_LFSR_SEED @ 0x60C
+			// 0:31  SEED
+			debug_writel(0x12345678, csid->base + CSID_TPG_LFSR_SEED, csid->base_unmapped, csid->base);
 
 			val = input_format->height & 0x1fff << TPG_DT_n_CFG_0_FRAME_HEIGHT;
 			val |= input_format->width & 0x1fff << TPG_DT_n_CFG_0_FRAME_WIDTH;
-			writel_relaxed(val, csid->base + CSID_TPG_DT_n_CFG_0(0));
+			printk("\n%s CAMSS_CSID_TG_DT_n_CFG_0\n", __func__);
+			printk("%s 0:14  FRAME_HEIGHT: %u\n", __func__, val & 0x3FFF);
+			printk("%s 16:31 FRAME_WIDTH: %u\n", __func__, (val & (0xFFFF << 16)) >> 16);
+
+			debug_writel(val, csid->base + CSID_TPG_DT_n_CFG_0(0), csid->base_unmapped, csid->base);
 
 			val = DATA_TYPE_RAW_10BIT << TPG_DT_n_CFG_1_DATA_TYPE;
-			writel_relaxed(val, csid->base + CSID_TPG_DT_n_CFG_1(0));
+			printk("\n%s CAMSS_CSID_TG_DT_n_CFG_1\n", __func__);
+			printk("%s 0:5   DATA_TYPE: %s (0x%x)\n", __func__, data_type_str(val & 0x3F), val & 0x3F);
+			printk("%s 8:13  ECC_XOR_MASK: %u\n", __func__, (val & (0x3F << 8)) >> 8);
+			printk("%s 16:21 CRC_XOR_MASK: %u\n", __func__, (val & (0xFFFF << 16)) >> 16);
+			debug_writel(val, csid->base + CSID_TPG_DT_n_CFG_1(0), csid->base_unmapped, csid->base);
 
 			val = tg->mode << TPG_DT_n_CFG_2_PAYLOAD_MODE;
 			val |= 0xBE << TPG_DT_n_CFG_2_USER_SPECIFIED_PAYLOAD;
 			val |= format->decode_format << TPG_DT_n_CFG_2_ENCODE_FORMAT;
-			writel_relaxed(val, csid->base + CSID_TPG_DT_n_CFG_2(0));
+			printk("\n%s CAMSS_CSID_TG_DT_n_CFG_2\n", __func__);
+			printk("%s 0:3   PAYLOAD_MODE: %s\n", __func__, pattern_str(val & 0x7));
+			printk("%s 4:11  USER_SPECIFIED_PAYLOAD: 0x%X\n", __func__, (val & (0xFF << 4)) >> 4);
+			printk("%s 16:19 ENCODE_FORMAT: %s\n", __func__, encode_format_str((val & (0xF << 16)) >> 16));
+			debug_writel(val, csid->base + CSID_TPG_DT_n_CFG_2(0), csid->base_unmapped, csid->base);
 
-			writel_relaxed(0, csid->base + CSID_TPG_COLOR_BARS_CFG);
+			debug_writel(0, csid->base + CSID_TPG_COLOR_BARS_CFG, csid->base_unmapped, csid->base);
 
-			writel_relaxed(0, csid->base + CSID_TPG_COLOR_BOX_CFG);
+			debug_writel(0, csid->base + CSID_TPG_COLOR_BOX_CFG, csid->base_unmapped, csid->base);
 		}
 
 		val = 1 << RDI_CFG0_BYTE_CNTR_EN;
@@ -388,42 +411,99 @@ static void csid_configure_stream(struct csid_device *csid, u8 enable)
 		val |= DATA_TYPE_RAW_10BIT << RDI_CFG0_DATA_TYPE;
 		val |= vc << RDI_CFG0_VIRTUAL_CHANNEL;
 		val |= dt_id << RDI_CFG0_DT_ID;
-		writel_relaxed(val, csid->base + CSID_RDI_CFG0(0));
+		printk("\n%s CAMSS_CSID_RDI_CFG0\n", __func__);
+		printk("%s 0     BYTE_CNTR_EN: %u\n", __func__, val & 0x1);
+		printk("%s 1     FORMAT_MEASURE_EN: %u\n", __func__, (val & (0x1 << 1)) >> 1);
+		printk("%s 2     TIMESTAMP_EN: %u\n", __func__, (val & (0x1 << 2)) >> 2);
+		printk("%s 3     DROP_H_EN: %u\n", __func__, (val & (0x1 << 3)) >> 3);
+		printk("%s 4     DROP_V_EN: %u\n", __func__, (val & (0x1 << 4)) >> 4);
+		printk("%s 5     CROP_H_EN: %u\n", __func__, (val & (0x1 << 5)) >> 5);
+		printk("%s 6     CROP_V_EN: %u\n", __func__, (val & (0x1 << 6)) >> 6);
+		printk("%s 7     MISR_EN: %u\n", __func__, (val & (0x1 << 7)) >> 7);
+		printk("%s 8     CGC_MODE: %s\n", __func__, ((val & (0x1 << 8)) >> 8) ? "ALWAYS_ON":"DYNAMIC_GATING");
+		printk("%s 9     PLAIN_ALIGNMENT: %s\n", __func__, ((val & (0x1 << 9)) >> 9) ? "MSB":"LSB");
+		printk("%s 10:11 PLAIN_FORMAT: %u\n", __func__, (val & (0x1 << 10)) >> 10);
+		printk("%s 12:15 DECODE_FORMAT: %s\n", __func__, decode_format_str((val & (0xF << 12)) >> 12));
+		printk("%s 16:21 DATA_TYPE: %s\n", __func__, data_type_str((val & (0x3F << 16)) >> 16));
+		printk("%s 22:26 VIRTUAL_CHANNEL: %u\n", __func__, (val & (0x1F << 22)) >> 22);
+		printk("%s 27:28 DT_ID: %u\n", __func__, (val & (0x3 << 27)) >> 27);
+		printk("%s 31    ENABLE: %u\n", __func__, (val & (0x1 << 31)) >> 31);
+		debug_writel(val, csid->base + CSID_RDI_CFG0(0), csid->base_unmapped, csid->base);
 
 		/* CSID_TIMESTAMP_STB_POST_IRQ */
 		val = 2 << RDI_CFG1_TIMESTAMP_STB_SEL;
-		writel_relaxed(val, csid->base + CSID_RDI_CFG1(0));
+		printk("\n%s CAMSS_CSID_RDI_CFG1\n", __func__);
+		printk("%s 0:1   TIMESTAMP_STB_SEL: %u - %s\n", __func__, val & 0x3, val == 2 ? "TIMESTAMP_STB_POST_IRQ":"");
+		debug_writel(val, csid->base + CSID_RDI_CFG1(0), csid->base_unmapped, csid->base);
 
 		val = 1;
-		writel_relaxed(val, csid->base + CSID_RDI_FRM_DROP_PERIOD(0));
+		printk("\n%s CAMSS_CSID_RDI_FRM_DROP_PERIOD\n", __func__);
+		printk("%s 0:4   PERIOD: %u\n", __func__, val & 0x1F);
+		debug_writel(val, csid->base + CSID_RDI_FRM_DROP_PERIOD(0), csid->base_unmapped, csid->base);
 
 		val = 0;
-		writel_relaxed(0, csid->base + CSID_RDI_FRM_DROP_PATTERN(0));
+		printk("\n%s CAMSS_CSID_RDI_FRM_DROP_PATTERN\n", __func__);
+		printk("%s 0:31  PATTERN: %u\n", __func__, val);
+		debug_writel(0, csid->base + CSID_RDI_FRM_DROP_PATTERN(0), csid->base_unmapped, csid->base);
 
 		val = 1;
-		writel_relaxed(val, csid->base + CSID_RDI_IRQ_SUBSAMPLE_PERIOD(0));
+		printk("\n%s CAMSS_CSID_RDI_IRQ_SUBSAMPLE_PERIOD\n", __func__);
+		printk("%s 0:4   PERIOD: %u\n", __func__, val  & 0x1F);
+		debug_writel(val, csid->base + CSID_RDI_IRQ_SUBSAMPLE_PERIOD(0), csid->base_unmapped, csid->base);
 
 		val = 0;
-		writel_relaxed(val, csid->base + CSID_RDI_IRQ_SUBSAMPLE_PATTERN(0));
+		printk("\n%s CAMSS_CSID_RDI_IRQ_SUBSAMPLE_PATTERN\n", __func__);
+		printk("%s 0:31  PATTERN: %u\n", __func__, val);
+		debug_writel(val, csid->base + CSID_RDI_IRQ_SUBSAMPLE_PATTERN(0), csid->base_unmapped, csid->base);
 
 		val = 1;
-		writel_relaxed(val, csid->base + CSID_RDI_RPP_PIX_DROP_PERIOD(0));
+		printk("\n%s CAMSS_CSID_RDI_RPP_PIX_DROP_PERIOD\n", __func__);
+		printk("%s 0:4  PERIOD: %u\n", __func__, val & 0x1F);
+		debug_writel(val, csid->base + CSID_RDI_RPP_PIX_DROP_PERIOD(0), csid->base_unmapped, csid->base);
 
 		val = 0;
-		writel_relaxed(val, csid->base + CSID_RDI_RPP_PIX_DROP_PATTERN(0));
+		printk("\n%s CAMSS_CSID_RDI_RPP_PIX_DROP_PATTERN\n", __func__);
+		printk("%s 0:31  PATTERN: %u\n", __func__, val);
+		debug_writel(val, csid->base + CSID_RDI_RPP_PIX_DROP_PATTERN(0), csid->base_unmapped, csid->base);
 
 		val = 1;
-		writel_relaxed(val, csid->base + CSID_RDI_RPP_LINE_DROP_PERIOD(0));
+		printk("\n%s CAMSS_CSID_RDI_RPP_LINE_DROP_PERIOD\n", __func__);
+		printk("%s 0:4  PERIOD: %u\n", __func__, val & 0x1F);
+		debug_writel(val, csid->base + CSID_RDI_RPP_LINE_DROP_PERIOD(0), csid->base_unmapped, csid->base);
 
 		val = 0;
-		writel_relaxed(val, csid->base + CSID_RDI_RPP_LINE_DROP_PATTERN(0));
+		printk("\n%s CAMSS_CSID_RDI_RPP_LINE_DROP_PATTERN\n", __func__);
+		printk("%s 0:31  PATTERN: %u\n", __func__, val);
+		debug_writel(val, csid->base + CSID_RDI_RPP_LINE_DROP_PATTERN(0), csid->base_unmapped, csid->base);
 
 		val = 0;
-		writel_relaxed(val, csid->base + CSID_RDI_CTRL(0));
+		printk("\n%s CAMSS_CSID_RDI_CTRL\n", __func__);
+		printk("%s 0:1    HALT_CMD: %u\n", __func__, val & 0x3);
+		printk("%s 2      HALT_MODE: %u\n", __func__, (val >> 2) & 0x1);
+		debug_writel(val, csid->base + CSID_RDI_CTRL(0), csid->base_unmapped, csid->base);
 
 		val = readl_relaxed(csid->base + CSID_RDI_CFG0(0));
 		val |=  1 << RDI_CFG0_ENABLE;
-		writel_relaxed(val, csid->base + CSID_RDI_CFG0(0));
+		printk("\n%s Read back CAMSS_CSID_RDI_CFG0\n", __func__);
+		printk("%s 0     BYTE_CNTR_EN: %u\n", __func__, val & 0x1);
+		printk("%s 1     FORMAT_MEASURE_EN: %u\n", __func__, (val & (0x1 << 1)) >> 1);
+		printk("%s 2     TIMESTAMP_EN: %u\n", __func__, (val & (0x1 << 2)) >> 2);
+		printk("%s 3     DROP_H_EN: %u\n", __func__, (val & (0x1 << 3)) >> 3);
+		printk("%s 4     DROP_V_EN: %u\n", __func__, (val & (0x1 << 4)) >> 4);
+		printk("%s 5     CROP_H_EN: %u\n", __func__, (val & (0x1 << 5)) >> 5);
+		printk("%s 6     CROP_V_EN: %u\n", __func__, (val & (0x1 << 6)) >> 6);
+		printk("%s 7     MISR_EN: %u\n", __func__, (val & (0x1 << 7)) >> 7);
+		printk("%s 8     CGC_MODE: %s\n", __func__, ((val & (0x1 << 8)) >> 8) ? "ALWAYS_ON":"DYNAMIC_GATING");
+		printk("%s 9     PLAIN_ALIGNMENT: %s\n", __func__, ((val & (0x1 << 9)) >> 9) ? "MSB":"LSB");
+		printk("%s 10:11 PLAIN_FORMAT: %s (0x%X)\n", __func__, plain_format_str((val >> 10) & 0x3), val >> 10 & 0x3);
+		printk("%s 12:15 DECODE_FORMAT: %s (0x%X)\n", __func__, decode_format_str(val >> 12 & 0xF), val >> 12 & 0xF);
+		printk("%s 16:21 DATA_TYPE: %s (0x%X)\n", __func__, data_type_str((val >> 16) & 0x3F), (val >> 16) & 0x3F);
+		printk("%s 22:26 VIRTUAL_CHANNEL: %u\n", __func__, (val & (0x1F << 22)) >> 22);
+		printk("%s 27:28 DT_ID: %u\n", __func__, (val & (0x3 << 27)) >> 27);
+		printk("%s 29    EARLY_EOF_EN: %u\n", __func__, (val >> 29) & 0x1);
+		printk("%s 30    PACKING_FORMAT: %s (0x%X)\n", __func__, (val >> 30 & 0x1) ? "MIPI" : "PLAIN", val >> 30 & 0x1);
+		printk("%s 31    ENABLE: %u\n", __func__, (val & (0x1 << 31)) >> 31);
+		debug_writel(val, csid->base + CSID_RDI_CFG0(0), csid->base_unmapped, csid->base);
 	}
 
 	if (tg->enabled) {
@@ -433,26 +513,42 @@ static void csid_configure_stream(struct csid_device *csid, u8 enable)
 		val |= (lane_cnt - 1) << TPG_CTRL_NUM_ACTIVE_LANES;
 		val |= 0x64 << TPG_CTRL_CYCLES_BETWEEN_PKTS;
 		val |= 0xA << TPG_CTRL_NUM_TRAIL_BYTES;
-		writel_relaxed(val, csid->base + CSID_TPG_CTRL);
+		debug_writel(val, csid->base + CSID_TPG_CTRL, csid->base_unmapped, csid->base);
 	}
 
 	val = (lane_cnt - 1) << CSI2_RX_CFG0_NUM_ACTIVE_LANES;
 	val |= csid->phy.lane_assign << CSI2_RX_CFG0_DL0_INPUT_SEL;
 	val |= phy_sel << CSI2_RX_CFG0_PHY_NUM_SEL;
-	writel_relaxed(val, csid->base + CSID_CSI2_RX_CFG0);
+	printk("\n%s CAMSS_CSID_CSI2_RX_CFG0\n", __func__);
+	printk("%s 0:1   NUM_ACTIVE_LANES: %u\n", __func__, val & 0x3);
+	printk("%s 4:5   DL0_INPUT_SEL: %u\n", __func__, (val & (0x3 << 4)) >> 4);
+	printk("%s 8:9   DL1_INPUT_SEL: %u\n", __func__, (val & (0x3 << 8)) >> 8);
+	printk("%s 12:13 DL2_INPUT_SEL: %u\n", __func__, (val & (0x3 << 12)) >> 12);
+	printk("%s 16:17 DL3_INPUT_SEL: %u\n", __func__, (val & (0x3 << 16)) >> 16);
+	printk("%s 20:21 PHY_NUM_SEL: %u\n", __func__, (val & (0x3 << 20)) >> 20);
+	printk("%s 24    PHY_TYPE_SEL: %s\n", __func__, ((val & (0x1 << 24)) >> 24) ? "CPHY":"DPHY");
+	debug_writel(val, csid->base + CSID_CSI2_RX_CFG0, csid->base_unmapped, csid->base);
 
 	val = 1 << CSI2_RX_CFG1_PACKET_ECC_CORRECTION_EN;
 	val |= 1 << CSI2_RX_CFG1_MISR_EN;
-	writel_relaxed(val, csid->base + CSID_CSI2_RX_CFG1); // csi2_vc_mode_shift_val ?
+	printk("\n%s CAMSS_CSID_CSI2_RX_CFG1\n", __func__);
+	printk("%s 0     PACKET_ECC_CORRECTION_EN: %u\n", __func__, val & 0x1);
+	printk("%s 1     DE_SCRAMBLE_EN: %u\n", __func__, (val & (0x1 << 1)) >> 1);
+	printk("%s 2     VC_MODE: %u\n", __func__, (val & (0x1 << 2)) >> 2);
+	printk("%s 4     COMPLETE_STREAM_EN: %u\n", __func__, (val & (0x1 << 4)) >> 4);
+	printk("%s 5     COMPLETE_STREAM_FRAME_TIMING: %u\n", __func__, (val & (0x1 << 5)) >> 5);
+	printk("%s 6     MISR_EN: %u\n", __func__, (val & (0x1 << 6)) >> 6);
+	printk("%s 7     CGC_MODE: %s\n", __func__, ((val & (0x1 << 7)) >> 7) ? "ALWAYS_ON":"DYNAMIC_GATING");
+	debug_writel(val, csid->base + CSID_CSI2_RX_CFG1, csid->base_unmapped, csid->base); // csi2_vc_mode_shift_val ?
 
 	/* error irqs start at BIT(11) */
-	writel_relaxed(~0u, csid->base + CSID_CSI2_RX_IRQ_MASK);
+	debug_writel(~0u, csid->base + CSID_CSI2_RX_IRQ_MASK, csid->base_unmapped, csid->base);
 
 	/* RDI irq */
-	writel_relaxed(~0u, csid->base + CSID_TOP_IRQ_MASK);
+	debug_writel(~0u, csid->base + CSID_TOP_IRQ_MASK, csid->base_unmapped, csid->base);
 
 	val = 1 << RDI_CTRL_HALT_CMD;
-	writel_relaxed(val, csid->base + CSID_RDI_CTRL(0));
+	debug_writel(val, csid->base + CSID_RDI_CTRL(0), csid->base_unmapped, csid->base);
 }
 
 static int csid_configure_testgen_pattern(struct csid_device *csid, s32 val)
@@ -500,20 +596,20 @@ static irqreturn_t csid_isr(int irq, void *dev)
 	u8 reset_done;
 
 	val = readl_relaxed(csid->base + CSID_TOP_IRQ_STATUS);
-	writel_relaxed(val, csid->base + CSID_TOP_IRQ_CLEAR);
+	debug_writel(val, csid->base + CSID_TOP_IRQ_CLEAR, csid->base_unmapped, csid->base);
 	reset_done = val & BIT(TOP_IRQ_STATUS_RESET_DONE);
 
 	dev_info(csid->camss->dev, "csid_isr(), irq_status = 0x%x, reset_done = %d", val, reset_done);
 	reset_done = 1;
 
 	val = readl_relaxed(csid->base + CSID_CSI2_RX_IRQ_STATUS);
-	writel_relaxed(val, csid->base + CSID_CSI2_RX_IRQ_CLEAR);
+	debug_writel(val, csid->base + CSID_CSI2_RX_IRQ_CLEAR, csid->base_unmapped, csid->base);
 
 	val = readl_relaxed(csid->base + CSID_CSI2_RDIN_IRQ_STATUS(0));
-	writel_relaxed(val, csid->base + CSID_CSI2_RDIN_IRQ_CLEAR(0));
+	debug_writel(val, csid->base + CSID_CSI2_RDIN_IRQ_CLEAR(0), csid->base_unmapped, csid->base);
 
 	val = 1 << IRQ_CMD_CLEAR;
-	writel_relaxed(val, csid->base + CSID_IRQ_CMD);
+	debug_writel(val, csid->base + CSID_IRQ_CMD, csid->base_unmapped, csid->base);
 
 	if (reset_done)
 		complete(&csid->reset_complete);
@@ -536,14 +632,14 @@ static int csid_reset(struct csid_device *csid)
 
 	reinit_completion(&csid->reset_complete);
 
-	writel_relaxed(1, csid->base + CSID_TOP_IRQ_CLEAR);
-	writel_relaxed(1, csid->base + CSID_IRQ_CMD);
-	writel_relaxed(1, csid->base + CSID_TOP_IRQ_MASK);
-	writel_relaxed(1, csid->base + CSID_IRQ_CMD);
+	debug_writel(1, csid->base + CSID_TOP_IRQ_CLEAR, csid->base_unmapped, csid->base);
+	debug_writel(1, csid->base + CSID_IRQ_CMD, csid->base_unmapped, csid->base);
+	debug_writel(1, csid->base + CSID_TOP_IRQ_MASK, csid->base_unmapped, csid->base);
+	debug_writel(1, csid->base + CSID_IRQ_CMD, csid->base_unmapped, csid->base);
 
 	/* preserve registers */
 	val = 0x1e << RST_STROBES;
-	writel_relaxed(val, csid->base + CSID_RST_STROBES);
+	debug_writel(val, csid->base + CSID_RST_STROBES, csid->base_unmapped, csid->base);
 
 	time = wait_for_completion_timeout(&csid->reset_complete,
 					   msecs_to_jiffies(CSID_RESET_TIMEOUT_MS));
