@@ -10,7 +10,6 @@
 	aliases {
 		serial0 = &blsp2_uart1;
 		serial1 = &blsp1_uart3;
-		display0 = &framebuffer0;
 	};
 
 	chosen {
@@ -19,43 +18,8 @@
 		ranges;
 
 		/* Add "earlycon" intended to be used in combination with UART serial console */
-		bootargs = "earlycon";
+		bootargs = "clk_ignore_unused earlycon";
 
-		stdout-path = "display0";
-
-		/*
-		 * HACK: Use display framebuffer setup by the UEFI XBL bootloader for simplefb.
-		 * the address was extracted from a bootloader dd image using the following:
-		 * $ strings xbl.img | grep 'Display Reserved'
-		 */
-		framebuffer0: framebuffer@9d400000 {
-			compatible = "simple-framebuffer";
-			reg = <0 0x9D400000 0 (1440 * 2280 * 4)>;
-			width = <1440>;
-			height = <2280>;
-			stride = <(1440 * 4)>;
-			format = "a8r8g8b8";
-		};
-	};
-
-	reserved-memory {
-		#address-cells = <2>;
- 		#size-cells = <2>;
- 		ranges;
-
-		/* HACK: Bootloader display framebuffer memory region */
-		fb_mem: memory@9d400000 {
-			compatible = "removed-dma-pool";
-			reg = <0 0x9D400000 0 (1440 * 2280 * 4)>;
-			no-map;
-		};
-
-		ramoops: ramoops@0b000000 {
-			compatible = "ramoops";
-			reg = <0 0x0b000000 0 0x200000>; /* 64kB */
-			record-size = <0x4000>; /* 16kB */
-			console-size = <0>; /* disabled by default */
-		};
 	};
 
 	vph_pwr: vph-pwr-regulator {
@@ -64,18 +28,6 @@
 		regulator-always-on;
 		regulator-boot-on;
 	};
-};
-
-&gpucc {
-	status = "disabled";
-};
-
-&anoc1_smmu {
-	status = "disabled";
-};
-
-&anoc2_smmu {
-	status = "disabled";
 };
 
 &pcie0 {
@@ -310,8 +262,91 @@
 // 	status = "okay";
 // };
 
+&mdss {
+	status = "okay";
+};
+
+&mdss_mdp {
+	status = "okay";
+};
+
+&dsi0 {
+	status = "okay";
+
+	vddio-supply = <&vreg_l14a_1p88>;
+
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&dsi_default>; // &panel_te_pin>;
+	pinctrl-1 = <&dsi_sleep>;
+	panel@0 {
+		compatible = "lge,sw43402";
+		reg = <0>;
+
+		//backlight = <&backlight>;
+		reset-gpios = <&tlmm 94 GPIO_ACTIVE_LOW>;
+		te-gpio = <&tlmm 10 0>;
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&dsi0_out>;
+			};
+		};
+	};
+};
+
+&dsi0_out {
+	data-lanes = <0 1 2 3>;
+	remote-endpoint = <&panel_in>;
+};
+
+&dsi0_phy {
+	status = "okay";
+	vdds-supply = <&vreg_l1a_0p875>;
+};
+
 &tlmm {
 	gpio-reserved-ranges = <0 4>, <81 4>;
+
+	dsi_default: mdss_dsi_active {
+		mux {
+			pins = "gpio94", "gpio133", "gpio21";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio94", "gpio133", "gpio21";
+			drive-strength = <8>; // 8 mA
+			bias-disable; // no pull
+		};
+	};
+
+	dsi_sleep: mdss_dsi_suspend {
+		mux {
+			pins = "gpio94", "gpio133", "gpio21";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio94", "gpio133", "gpio21";
+			drive-strength = <2>; // 2 mA
+			bias-pull-down;
+		};
+	};
+
+	// panel_te_pin: panel-te {
+	// 	mux {
+	// 		pins = "gpio10";
+	// 		function = "mdp_vsync";
+	// 	};
+
+	// 	config {
+	// 		pins = "gpio10";
+	// 		drive-strength = <2>;
+	// 		bias-disable;
+	// 		input-enable;
+	// 	};
+	// };
+
 };
 
 &ufshc {

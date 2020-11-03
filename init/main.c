@@ -897,7 +897,7 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 
 	/* trace_printk can be enabled here */
 	early_trace_init();
-
+	
 	/*
 	 * Set up the scheduler prior starting any interrupts (such as the
 	 * timer interrupt). Full topology setup happens at smp_init()
@@ -1402,6 +1402,22 @@ static int __ref kernel_init(void *unused)
 {
 	int ret;
 
+<<<<<<< HEAD
+=======
+	//Manually dump pstore here
+    // copy the dmesg into the ram region
+    // without compression or encryption.
+    // will be visible in Pixel 3 downstream /dev/access-ramoops.
+    // (yeah this isn't how you're supposed to use pstore, but I really want to get the log, ok?)
+    // void* ramoops = ioremap(0xa1810000ULL, 0x200000);
+    // memset(ramoops, 'F', 0x200000);
+	// memcpy(ramoops, log_buf_addr_get(), min(log_buf_len_get(), 0x200000));
+
+	// int* pshold = ioremap(0x10ac000, 4);
+    // *pshold = 0; // reboot
+    // while (1) {}
+
+>>>>>>> fe6509c8d8c3... boots with USB and black display panel (with drm_msm errors)
 	kernel_init_freeable();
 	/* need to finish all async __init code before freeing the memory */
 	async_synchronize_full();
