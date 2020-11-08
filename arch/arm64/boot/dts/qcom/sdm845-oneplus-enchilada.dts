@@ -13,6 +13,7 @@
 
 	qcom,battery-data {
 		qcom,max-voltage-uv = <4370000>;
+		qcom,design-capacity = <3300000>;
 		qcom,fg-cc-cv-threshold-mv = <4360>;
 		qcom,fastchg-current-ma = <3000>;
 		qcom,batt-id-kohm = <200>;
