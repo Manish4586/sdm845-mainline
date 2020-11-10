@@ -22,6 +22,9 @@
 		hsuart0 = &uart6;
 	};
 
+	chosen {
+	};
+
 	vph_pwr: vph-pwr-regulator {
 		compatible = "regulator-fixed";
 		regulator-name = "vph_pwr";
@@ -633,9 +636,9 @@
 		status = "okay";
 		clock-frequency = <100000>;
 
-		bq27411_battery: bq27411-battery@55 {
-				status = "okay";
-				compatible = "ti,BQ27411";
+		bq27541_battery: bq27541-battery@55 {
+				status = "disabled";
+				compatible = "ti,bq27541";
 				reg = <0x55>;
 		};
 };
