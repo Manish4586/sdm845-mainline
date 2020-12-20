@@ -36,7 +36,6 @@
 #define REG_BASE(chip)              (chip->base)
 #define REG_BATT(chip)              (chip->base + 0x100)
 #define REG_MEM(chip)               (chip->base + 0x400)
-#define REG_CHG(chip)               (0x1000)
 
 /* Interrupt offsets */
 #define INT_RT_STS                  0x10

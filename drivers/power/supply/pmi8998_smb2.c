@@ -12,13 +12,13 @@
 #include <linux/types.h>
 #include <linux/power_supply.h>
 #include <linux/module.h>
+#include <linux/regulator/driver.h>
 
 #include "pmi8998_smb2.h"
 
-
 static int smb2_probe(struct platform_device *pdev)
 {
-	struct pmi8998_smb2_charger *chip;
+	struct pmi8998_smb2_chip *chip;
 	int rc = 0;
 	union power_supply_propval val;
 	int usb_present, batt_present, batt_health, batt_charge_type;
@@ -28,28 +28,26 @@ static int smb2_probe(struct platform_device *pdev)
 	if (!chip)
 		return -ENOMEM;
 
-	chg = &chip->chg;
-
-	chg->regmap = dev_get_regmap(chg->dev->parent, NULL);
-	if (!chg->regmap) {
+	chip->regmap = dev_get_regmap(chip->dev->parent, NULL);
+	if (!chip->regmap) {
 		pr_err("parent regmap is missing\n");
 		return -EINVAL;
 	}
 
-	rc = smb2_chg_config_init(chip);
-	if (rc < 0) {
-		if (rc != -EPROBE_DEFER)
-			pr_err("Couldn't setup chg_config rc=%d\n", rc);
-		return rc;
-	}
+	// rc = smb2_chip_config_init(chip);
+	// if (rc < 0) {
+	// 	if (rc != -EPROBE_DEFER)
+	// 		pr_err("Couldn't setup chip_config rc=%d\n", rc);
+	// 	return rc;
+	// }
 
-	rc = smb2_parse_dt(chip);
-	if (rc < 0) {
-		pr_err("Couldn't parse device tree rc=%d\n", rc);
-		goto cleanup;
-	}
+	// rc = smb2_parse_dt(chip);
+	// if (rc < 0) {
+	// 	pr_err("Couldn't parse device tree rc=%d\n", rc);
+	// 	goto cleanup;
+	// }
 
-	rc = smblib_init(chg);
+	rc = smblib_init(chip);
 	if (rc < 0) {
 		pr_err("Smblib_init failed rc=%d\n", rc);
 		goto cleanup;
@@ -58,13 +56,11 @@ static int smb2_probe(struct platform_device *pdev)
 	/* set driver data before resources request it */
 	platform_set_drvdata(pdev, chip);
 
-/* david.liu@bsp, 20171228 Fix abnormal animation */
-	op_charge_info_init(chg);
 	pdata = msm_bus_cl_get_pdata(pdev);
 	if (!pdata)
 		pr_err("Fail to get bus data\n");
 	else
-		chg->bus_client = msm_bus_scale_register_client(pdata);
+		chip->bus_client = msm_bus_scale_register_client(pdata);
 
 	rc = smb2_init_vbus_regulator(chip);
 	if (rc < 0) {
@@ -80,18 +76,9 @@ static int smb2_probe(struct platform_device *pdev)
 		goto cleanup;
 	}
 
-	/* extcon registration */
-	chg->extcon = devm_extcon_dev_allocate(chg->dev, smblib_extcon_cable);
-	if (IS_ERR(chg->extcon)) {
-		rc = PTR_ERR(chg->extcon);
-		dev_err(chg->dev, "failed to allocate extcon device rc=%d\n",
-				rc);
-		goto cleanup;
-	}
-
-	rc = devm_extcon_dev_register(chg->dev, chg->extcon);
+	rc = devm_extcon_dev_register(chip->dev, chip->extcon);
 	if (rc < 0) {
-		dev_err(chg->dev, "failed to register extcon device rc=%d\n",
+		dev_err(chip->dev, "failed to register extcon device rc=%d\n",
 				rc);
 		goto cleanup;
 	}
@@ -153,28 +140,28 @@ static int smb2_probe(struct platform_device *pdev)
 
 	smb2_create_debugfs(chip);
 
-	rc = smblib_get_prop_usb_present(chg, &val);
+	rc = smblib_get_prop_usb_present(chip, &val);
 	if (rc < 0) {
 		pr_err("Couldn't get usb present rc=%d\n", rc);
 		goto cleanup;
 	}
 	usb_present = val.intval;
 
-	rc = smblib_get_prop_batt_present(chg, &val);
+	rc = smblib_get_prop_batt_present(chip, &val);
 	if (rc < 0) {
 		pr_err("Couldn't get batt present rc=%d\n", rc);
 		goto cleanup;
 	}
 	batt_present = val.intval;
 
-	rc = smblib_get_prop_batt_health(chg, &val);
+	rc = smblib_get_prop_batt_health(chip, &val);
 	if (rc < 0) {
 		pr_err("Couldn't get batt health rc=%d\n", rc);
 		val.intval = POWER_SUPPLY_HEALTH_UNKNOWN;
 	}
 	batt_health = val.intval;
 
-	rc = smblib_get_prop_batt_charge_type(chg, &val);
+	rc = smblib_get_prop_batt_charge_type(chip, &val);
 	if (rc < 0) {
 		pr_err("Couldn't get batt charge type rc=%d\n", rc);
 		goto cleanup;
@@ -188,38 +175,38 @@ static int smb2_probe(struct platform_device *pdev)
 #endif
 
 	if (usb_present) {
-		chg->boot_usb_present = true;
+		chip->boot_usb_present = true;
 	}
-	if (!usb_present && chg->vbus_present)
-		op_handle_usb_plugin(chg);
+	if (!usb_present && chip->vbus_present)
+		op_handle_usb_plugin(chip);
 
-	device_init_wakeup(chg->dev, true);
-	chg->probe_done = true;
-	request_plug_irq(chg);
-	requset_vbus_ctrl_gpio(chg);
+	device_init_wakeup(chip->dev, true);
+	chip->probe_done = true;
+	request_plug_irq(chip);
+	requset_vbus_ctrl_gpio(chip);
 	pr_info("QPNP SMB2 probed successfully usb:present=%d type=%d batt:present = %d health = %d charge = %d\n",
-		usb_present, chg->real_charger_type,
+		usb_present, chip->real_charger_type,
 		batt_present, batt_health, batt_charge_type);
 	return rc;
 
 cleanup:
-	smb2_free_interrupts(chg);
-	if (chg->batt_psy)
-		power_supply_unregister(chg->batt_psy);
-	if (chg->usb_main_psy)
-		power_supply_unregister(chg->usb_main_psy);
-	if (chg->usb_psy)
-		power_supply_unregister(chg->usb_psy);
-	if (chg->usb_port_psy)
-		power_supply_unregister(chg->usb_port_psy);
-	if (chg->dc_psy)
-		power_supply_unregister(chg->dc_psy);
-	if (chg->vconn_vreg && chg->vconn_vreg->rdev)
-		devm_regulator_unregister(chg->dev, chg->vconn_vreg->rdev);
-	if (chg->vbus_vreg && chg->vbus_vreg->rdev)
-		devm_regulator_unregister(chg->dev, chg->vbus_vreg->rdev);
+	smb2_free_interrupts(chip);
+	if (chip->batt_psy)
+		power_supply_unregister(chip->batt_psy);
+	if (chip->usb_main_psy)
+		power_supply_unregister(chip->usb_main_psy);
+	if (chip->usb_psy)
+		power_supply_unregister(chip->usb_psy);
+	if (chip->usb_port_psy)
+		power_supply_unregister(chip->usb_port_psy);
+	if (chip->dc_psy)
+		power_supply_unregister(chip->dc_psy);
+	if (chip->vconn_vreg && chip->vconn_vreg->rdev)
+		devm_regulator_unregister(chip->dev, chip->vconn_vreg->rdev);
+	if (chip->vbus_vreg && chip->vbus_vreg->rdev)
+		devm_regulator_unregister(chip->dev, chip->vbus_vreg->rdev);
 
-	smblib_deinit(chg);
+	smblib_deinit(chip);
 
 	platform_set_drvdata(pdev, NULL);
 	return rc;

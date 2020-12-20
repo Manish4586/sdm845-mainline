@@ -637,7 +637,7 @@
 		clock-frequency = <100000>;
 
 		bq27541_battery: bq27541-battery@55 {
-				status = "disabled";
+				status = "okay";
 				compatible = "ti,bq27541";
 				reg = <0x55>;
 		};

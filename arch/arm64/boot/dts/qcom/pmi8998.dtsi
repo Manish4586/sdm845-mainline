@@ -9,6 +9,13 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 
+		pmi8998_smb2: smb2_charger {
+			compatible = "qcom,pmi8998-smb2";
+			status = "okay";
+
+			reg = <0x1000>;
+		};
+
 		pmi8998_fg: fuel_guage {
 			compatible = "qcom,pmi8998-fg";
 			status = "okay";
@@ -18,13 +25,6 @@
 			reg = <0x4000>;
 
 			qcom,term-current-ma = <100>;
-		};
-
-		pmi8998_smb2: smb2_charger {
-			compatible = "qcom,pmi8998-smb2";
-			status = "okay";
-
-			reg = <0x1000>;
 		};
 
 		pmi8998_gpio: gpios@c000 {

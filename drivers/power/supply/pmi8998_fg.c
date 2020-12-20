@@ -323,7 +323,7 @@ static int fg_get_property(struct power_supply *psy,
 		union power_supply_propval *val)
 {
 	struct pmi8998_fg_chip *chip = power_supply_get_drvdata(psy);
-	int error = 0, temp;
+	int error = 0;
 
 	dev_info(chip->dev, "Getting property: %d", psp);
 
@@ -360,7 +360,8 @@ static int fg_get_property(struct power_supply *psy,
 		val->intval = chip->batt_info.nom_cap_uah;
 		break;
 	case POWER_SUPPLY_PROP_STATUS:
-		error = smb2_chg_get_status(chip, &val->intval);
+		val->intval = POWER_SUPPLY_STATUS_CHARGING;
+		//error = smb2_chg_get_status(chip, &val->intval);
 		break;
 	case POWER_SUPPLY_PROP_HEALTH:
 		val->intval = POWER_SUPPLY_HEALTH_GOOD;
@@ -383,8 +384,7 @@ static const struct power_supply_desc bms_psy_desc = {
 static int pmi8998_fg_of_battery_init(struct pmi8998_fg_chip *chip){
 	struct device_node *batt_node;
 	struct device_node *node = chip->dev->of_node;
-	int rc = 0, len = 0;
-	const char *data;
+	int rc = 0;
 
 	batt_node = of_find_node_by_name(node, "qcom,battery-data");
 	if (!batt_node) {
