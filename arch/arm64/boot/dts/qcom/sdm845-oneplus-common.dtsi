@@ -429,6 +429,10 @@
 	};
 };
 
+&pmi8998_fg {
+	status = "okay";
+};
+
 &gcc {
 	protected-clocks = <GCC_QSPI_CORE_CLK>,
 				<GCC_QSPI_CORE_CLK_SRC>,
