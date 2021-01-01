@@ -128,23 +128,6 @@ static int pmi8998_fg_get_capacity(struct pmi8998_fg_chip *chip, int *val)
 	return 0;
 }
 
-static bool pmi8998_battery_missing(struct pmi8998_fg_chip *chip)
-{
-	int rc;
-	u8 fg_batt_sts;
-
-	rc = pmi8998_read(chip->regmap, &fg_batt_sts,
-				 REG_BATT(chip) + INT_RT_STS, 1);
-	if (rc) {
-		pr_warn("read read failed: addr=%03X, rc=%d\n",
-				REG_BATT(chip) + INT_RT_STS, rc);
-		return false;
-	}
-
-	// Bit 6 is set if the battery is missing
-	return (fg_batt_sts & BIT(6)) ? true : false;
-}
-
 static int pmi8998_fg_get_temperature(struct pmi8998_fg_chip *chip, int *val)
 {
 	int rc, temp;
@@ -187,24 +170,6 @@ static int pmi8998_fg_get_voltage(struct pmi8998_fg_chip *chip, int *val)
 	u8 readval[2];
 
 	rc = pmi8998_read(chip->regmap, readval, REG_BATT(chip) + PARAM_ADDR_BATT_VOLTAGE, 2);
-	if (rc) {
-		pr_err("Failed to read voltage\n");
-		return rc;
-	}
-
-	temp = readval[1] << 8 | readval[0];
-	temp = twos_compliment_extend(temp, 2);
-	*val = div_s64((s64)temp * 122070,
-			1000);
-	return 0;
-}
-
-static int pmi8998_fg_get_max_charge_design(struct pmi8998_fg_chip *chip, int *val)
-{
-	int rc, temp;
-	u8 readval[2];
-
-	rc = pmi8998_read(chip->regmap, readval, REG_BATT(chip) + BATT_INFO_CHARGE_MAX_DESIGN, 2);
 	if (rc) {
 		pr_err("Failed to read voltage\n");
 		return rc;
@@ -413,7 +378,7 @@ static int fg_get_property(struct power_supply *psy,
 		error = pmi8998_fg_get_voltage(chip, &val->intval);
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
-		val->intval = chip->batt_info.batt_max_voltage_uv;
+		val->intval = chip->batt_max_voltage_uv;
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
 		error = pmi8998_fg_get_temperature(chip, &val->intval);
@@ -421,16 +386,26 @@ static int fg_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
 		val->intval = 3370000;
 		break;
-	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
-	case POWER_SUPPLY_PROP_CHARGE_FULL: /* TODO: Implement learning */
-		val->intval = chip->batt_info.nom_cap_uah;
-		break;
 	case POWER_SUPPLY_PROP_STATUS:
 		error = pmi8998_get_prop_batt_status(chip, &val->intval);
 		break;
 	case POWER_SUPPLY_PROP_HEALTH:
 		val->intval = POWER_SUPPLY_HEALTH_GOOD;
 		break;
+	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
+	case POWER_SUPPLY_PROP_CHARGE_FULL: /* TODO: Implement learning */
+		val->intval = chip->batt_cap_uah;
+		break;
+
+	//POWER_SUPPLY_PROP_HEALTH
+	//POWER_SUPPLY_PROP_TIME_TO_FULL_AVG
+	//POWER_SUPPLY_PROP_TIME_TO_EMPTY_AVG
+	//POWER_SUPPLY_PROP_CHARGE_NOW
+	//POWER_SUPPLY_PROP_CYCLE_COUNT
+	//POWER_SUPPLY_PROP_CHARGE_COUNTER
+	//POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT
+	//POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX
+	//POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT
 	default:
 		pr_err("invalid property: %d\n", psp);
 		return -EINVAL;
@@ -446,30 +421,29 @@ static const struct power_supply_desc bms_psy_desc = {
 	.get_property = fg_get_property,
 };
 
-static int pmi8998_fg_of_battery_init(struct pmi8998_fg_chip *chip){
-	struct device_node *batt_node;
-	struct device_node *node = chip->dev->of_node;
-	int rc = 0;
-
-	batt_node = of_find_node_by_name(node, "qcom,battery-data");
-	if (!batt_node) {
-		pr_err("No available batterydata\n");
-		return rc;
-	}
-
-	of_property_read_u32(batt_node, "qcom,max-voltage-uv",
-					&chip->batt_info.batt_max_voltage_uv_design);
-	
-	// Can be read from SRAM, hardcode in DTS for now as reading SRAM is HARD!
-	of_property_read_u32(batt_node, "qcom,design-capacity",
-					&chip->batt_info.nom_cap_uah);
-
-	return rc;
-}
-
 irqreturn_t pmi8998_handle_usb_plugin(int irq, void *data){
 	struct pmi8998_fg_chip *chip = data;
-	dev_dbg(chip->dev, "USB IRQ called!\n");
+	int rc;
+	unsigned int stat;
+	bool vbus_rising;
+	union power_supply_propval val;
+
+	rc = regmap_read(chip->regmap, USBIN_BASE + INT_RT_STS, &stat);
+	if (rc < 0){
+		dev_err(chip->dev, "Couldn't read USB status from reg! ret=%d\n", rc);
+		return rc;
+	}
+	vbus_rising = (bool)(stat & BIT(4));
+
+	if (vbus_rising) {
+		val.intval = POWER_SUPPLY_STATUS_CHARGING;
+		power_supply_set_property(chip->bms_psy, POWER_SUPPLY_PROP_STATUS, &val);
+	} else {
+		val.intval = POWER_SUPPLY_STATUS_DISCHARGING;
+		power_supply_set_property(chip->bms_psy, POWER_SUPPLY_PROP_STATUS, &val);
+	}	
+
+	dev_dbg(chip->dev, "USB IRQ: %s\n", vbus_rising ? "attached" : "detached");
 	power_supply_changed(chip->bms_psy);
 	return IRQ_HANDLED;
 }
@@ -511,6 +485,20 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 	chip->chg_base = be32_to_cpu(*prop_addr);
+
+	rc = of_property_read_u32(pdev->dev.of_node, "qcom,max-voltage-uv",
+					&chip->batt_max_voltage_uv);
+	if (rc < 0) {
+		dev_err(chip->dev, "Error in reading qcom,max-voltage-uv, rc=%d\n", rc);
+		return rc;
+	}
+	
+	rc = of_property_read_u32(pdev->dev.of_node, "qcom,battery-capacity-ua",
+					&chip->batt_cap_uah);
+	if (rc < 0) {
+		dev_err(chip->dev, "Error in reading qcom,battery-capacity-ua, rc=%d\n", rc);
+		return rc;
+	}
 
 	// Init memif fn inlined here (chip hardware info)
 	rc = pmi8998_read(chip->regmap, chip->revision, REG_MEM(chip) + DIG_MINOR, 4);
