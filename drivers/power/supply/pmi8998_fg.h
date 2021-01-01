@@ -47,6 +47,7 @@
 #define PARAM_ADDR_BATT_CURRENT    0xa2
 
 #define MISC_BASE	0x1600
+#define USBIN_BASE  0x1300
 
 #define BATTERY_CHARGER_STATUS_REG(chip)	(chip->chg_base + 0x06)
 #define BATTERY_CHARGER_STATUS_MASK GENMASK(2, 0)
@@ -97,33 +98,6 @@ static enum power_supply_property fg_properties[] = {
 	POWER_SUPPLY_PROP_STATUS,
 };
 
-struct fg_learning_data {
-	struct mutex    learning_lock;
-	bool            active;
-	int64_t         cc_uah;
-	int             learned_cc_uah;
-	int             init_cc_pc_val;
-	int             max_start_soc;
-	int             max_increment;
-	int             max_decrement;
-	int             vbat_est_thr_uv;
-	int             max_cap_limit;
-	int             min_cap_limit;
-	int             min_temp;
-	int             max_temp;
-};
-
-struct battery_info {
-	const char *manufacturer;
-	const char *model;
-	const char *serial_num;
-
-	int nom_cap_uah;
-
-	int batt_max_voltage_uv_design;
-	int batt_max_voltage_uv;
-};
-
 struct pmi8998_fg_chip {
 	struct device *dev;
 	unsigned int base;
@@ -136,9 +110,8 @@ struct pmi8998_fg_chip {
 	u8 revision[4];
 	bool ima_supported;
 
-	struct battery_info batt_info;
-
-	struct fg_learning_data learning_data;
+	int batt_cap_uah;
+	int batt_max_voltage_uv;
 
 	int health;
 	int status;
