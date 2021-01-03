@@ -349,6 +349,30 @@ int pmi8998_get_prop_batt_status(struct pmi8998_fg_chip *chip, int *val){
 	return rc;
 }
 
+int pmi8998_get_prop_health_status(struct pmi8998_fg_chip *chip, int *val){
+	unsigned int stat;
+	int rc;
+
+	rc = regmap_read(chip->regmap, BATTERY_HEALTH_STATUS_REG(chip), &stat);
+	if (rc < 0){
+		dev_err(chip->dev, "Health status REGMAP read failed! ret=%d\n", rc);
+		return rc;
+	}
+
+	if (stat & BIT(0))
+		*val = POWER_SUPPLY_HEALTH_COLD;
+	else if (stat & BIT(1))
+		*val = POWER_SUPPLY_HEALTH_OVERHEAT;
+	else if (stat & BIT(2))
+		*val = POWER_SUPPLY_HEALTH_COOL;
+	else if (stat & BIT(3))
+		*val = POWER_SUPPLY_HEALTH_WARM;
+	else
+		*val = POWER_SUPPLY_HEALTH_GOOD;
+	
+	return rc;
+}
+
 static int fg_get_property(struct power_supply *psy,
 		enum power_supply_property psp,
 		union power_supply_propval *val)
@@ -384,28 +408,32 @@ static int fg_get_property(struct power_supply *psy,
 		error = pmi8998_fg_get_temperature(chip, &val->intval);
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
-		val->intval = 3370000;
+		val->intval = 3370000; //read from chip
 		break;
 	case POWER_SUPPLY_PROP_STATUS:
 		error = pmi8998_get_prop_batt_status(chip, &val->intval);
 		break;
 	case POWER_SUPPLY_PROP_HEALTH:
-		val->intval = POWER_SUPPLY_HEALTH_GOOD;
+		error = pmi8998_get_prop_health_status(chip, &val->intval);
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
-	case POWER_SUPPLY_PROP_CHARGE_FULL: /* TODO: Implement learning */
+	case POWER_SUPPLY_PROP_CHARGE_FULL: /* TODO: Implement capacity learning */
 		val->intval = chip->batt_cap_uah;
 		break;
-
-	//POWER_SUPPLY_PROP_HEALTH
-	//POWER_SUPPLY_PROP_TIME_TO_FULL_AVG
-	//POWER_SUPPLY_PROP_TIME_TO_EMPTY_AVG
-	//POWER_SUPPLY_PROP_CHARGE_NOW
-	//POWER_SUPPLY_PROP_CYCLE_COUNT
-	//POWER_SUPPLY_PROP_CHARGE_COUNTER
-	//POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT
-	//POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX
-	//POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT
+	//POWER_SUPPLY_PROP_VOLTAGE_MIN - easy to get
+	//POWER_SUPPLY_PROP_TEMP_MIN - jeita cold - easy to get, but values hardcoded in fg1. address(not used) hardcoded differs for old pmics. needs fg1 vs fg3 handling
+	//POWER_SUPPLY_PROP_TEMP_MAX - jeita hot - easy to get, but values hardcoded in fg1. address(not used) hardcoded differs for old pmics. needs fg1 vs fg3 handling
+	//POWER_SUPPLY_PROP_TEMP_ALERT_MIN - jeita cool - easy to get, but values hardcoded in fg1. address(not used) hardcoded differs for old pmics. needs fg1 vs fg3 handling
+	//POWER_SUPPLY_PROP_TEMP_ALERT_MAX - jeita warm - easy to get, but values hardcoded in fg1. address(not used) hardcoded differs for old pmics. needs fg1 vs fg3 handling
+	//POWER_SUPPLY_PROP_TIME_TO_FULL_AVG - calculate time remaining for full charge - implementable
+	//POWER_SUPPLY_PROP_TIME_TO_EMPTY_AVG - calculate time remaining when discharging - implementable
+	//POWER_SUPPLY_PROP_CHARGE_NOW - requires capacity learning
+	//POWER_SUPPLY_PROP_CHARGE_FULL - requires capacity learning
+	//POWER_SUPPLY_PROP_CYCLE_COUNT - needs votables - no idea how they work
+	//POWER_SUPPLY_PROP_CHARGE_COUNTER - easy to get. represent the charge available as mah
+	//POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT -  needs votables - no idea how they work
+	//POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX -  needs votables - no idea how they work
+	//POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT - needs votables - no idea how they work
 	default:
 		pr_err("invalid property: %d\n", psp);
 		return -EINVAL;

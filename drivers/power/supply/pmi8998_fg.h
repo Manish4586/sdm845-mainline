@@ -50,6 +50,8 @@
 #define USBIN_BASE  0x1300
 
 #define BATTERY_CHARGER_STATUS_REG(chip)	(chip->chg_base + 0x06)
+#define BATTERY_HEALTH_STATUS_REG(chip)	(chip->chg_base + 0x07)
+
 #define BATTERY_CHARGER_STATUS_MASK GENMASK(2, 0)
 #define POWER_PATH_STATUS_REG	(MISC_BASE + 0x0B)
 
