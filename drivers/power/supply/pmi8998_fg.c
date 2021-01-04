@@ -399,14 +399,13 @@ static int fg_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		error = pmi8998_fg_get_voltage(chip, &val->intval);
 		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
+	case POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN:
+		val->intval = chip->batt_min_voltage_uv;
+		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
 		val->intval = chip->batt_max_voltage_uv;
-		break;
-	case POWER_SUPPLY_PROP_TEMP:
-		error = pmi8998_fg_get_temperature(chip, &val->intval);
-		break;
-	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
-		val->intval = 3370000; //read from chip
 		break;
 	case POWER_SUPPLY_PROP_STATUS:
 		error = pmi8998_get_prop_batt_status(chip, &val->intval);
@@ -418,7 +417,9 @@ static int fg_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CHARGE_FULL: /* TODO: Implement capacity learning */
 		val->intval = chip->batt_cap_uah;
 		break;
-	//POWER_SUPPLY_PROP_VOLTAGE_MIN - easy to get
+	case POWER_SUPPLY_PROP_TEMP:
+		error = pmi8998_fg_get_temperature(chip, &val->intval);
+		break;
 	//POWER_SUPPLY_PROP_TEMP_MIN - jeita cold - easy to get, but values hardcoded in fg1. address(not used) hardcoded differs for old pmics. needs fg1 vs fg3 handling
 	//POWER_SUPPLY_PROP_TEMP_MAX - jeita hot - easy to get, but values hardcoded in fg1. address(not used) hardcoded differs for old pmics. needs fg1 vs fg3 handling
 	//POWER_SUPPLY_PROP_TEMP_ALERT_MIN - jeita cool - easy to get, but values hardcoded in fg1. address(not used) hardcoded differs for old pmics. needs fg1 vs fg3 handling
@@ -427,8 +428,8 @@ static int fg_get_property(struct power_supply *psy,
 	//POWER_SUPPLY_PROP_TIME_TO_EMPTY_AVG - calculate time remaining when discharging - implementable
 	//POWER_SUPPLY_PROP_CHARGE_NOW - requires capacity learning
 	//POWER_SUPPLY_PROP_CHARGE_FULL - requires capacity learning
+	//POWER_SUPPLY_PROP_CHARGE_COUNTER - requires capacity learning
 	//POWER_SUPPLY_PROP_CYCLE_COUNT - needs votables - no idea how they work
-	//POWER_SUPPLY_PROP_CHARGE_COUNTER - easy to get. represent the charge available as mah
 	//POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT -  needs votables - no idea how they work
 	//POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX -  needs votables - no idea how they work
 	//POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT - needs votables - no idea how they work
@@ -511,6 +512,13 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 	chip->chg_base = be32_to_cpu(*prop_addr);
+
+	rc = of_property_read_u32(pdev->dev.of_node, "qcom,min-voltage-uv",
+					&chip->batt_min_voltage_uv);
+	if (rc < 0) {
+		dev_err(chip->dev, "Error in reading qcom,min-voltage-uv, rc=%d\n", rc);
+		return rc;
+	}
 
 	rc = of_property_read_u32(pdev->dev.of_node, "qcom,max-voltage-uv",
 					&chip->batt_max_voltage_uv);
