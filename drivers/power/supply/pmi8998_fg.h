@@ -114,6 +114,7 @@ struct pmi8998_fg_chip {
 
 	int batt_cap_uah;
 	int batt_max_voltage_uv;
+	int batt_min_voltage_uv;
 
 	int health;
 	int status;
