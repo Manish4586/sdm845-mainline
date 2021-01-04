@@ -176,9 +176,7 @@ static int pmi8998_fg_get_voltage(struct pmi8998_fg_chip *chip, int *val)
 	}
 
 	temp = readval[1] << 8 | readval[0];
-	temp = twos_compliment_extend(temp, 2);
-	*val = div_s64((s64)temp * 122070,
-			1000);
+	*val = div_u64((u64)temp * 122070, 1000);
 	return 0;
 }
 
