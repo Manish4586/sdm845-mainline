@@ -9,6 +9,7 @@ Qualcomm Camera Subsystem
 		- "qcom,msm8916-camss"
 		- "qcom,msm8996-camss"
 		- "qcom,sdm660-camss"
+		- "qcom,sdm845-camss"
 - reg:
 	Usage: required
 	Value type: <prop-encoded-array>
@@ -18,19 +19,21 @@ Qualcomm Camera Subsystem
 	Value type: <stringlist>
 	Definition: Should contain the following entries:
 		- "csiphy0"
-		- "csiphy0_clk_mux"
+		- "csiphy0_clk_mux"	(not 845)
 		- "csiphy1"
-		- "csiphy1_clk_mux"
-		- "csiphy2"		(8996 only)
+		- "csiphy1_clk_mux"	(not 845)
+		- "csiphy2"		(8996 & 845)
 		- "csiphy2_clk_mux"	(8996 only)
+		- "csiphy3"		(845 only)
 		- "csid0"
 		- "csid1"
-		- "csid2"		(8996 only)
-		- "csid3"		(8996 only)
+		- "csid2"		(8996 & 845)
+		- "csid3"		(8996 & 845)
 		- "ispif"
-		- "csi_clk_mux"
+		- "csi_clk_mux"		(not 845)
 		- "vfe0"
-		- "vfe1"		(8996 only)
+		- "vfe1"		(8996 & 845)
+		- "vfe_lite"		(845 only)
 - interrupts:
 	Usage: required
 	Value type: <prop-encoded-array>
@@ -41,14 +44,16 @@ Qualcomm Camera Subsystem
 	Definition: Should contain the following entries:
 		- "csiphy0"
 		- "csiphy1"
-		- "csiphy2"		(8996 only)
+		- "csiphy2"		(8996 & 845)
+		- "csiphy3"		(845 only)
 		- "csid0"
 		- "csid1"
-		- "csid2"		(8996 only)
+		- "csid2"		(8996 & 845)
 		- "csid3"		(8996 only)
 		- "ispif"
 		- "vfe0"
-		- "vfe1"		(8996 only)
+		- "vfe1"		(8996 & 845)
+		- "vfe_lite"		(845 only)
 - power-domains:
 	Usage: required
 	Value type: <prop-encoded-array>
@@ -67,27 +72,40 @@ Qualcomm Camera Subsystem
 		- "top_ahb"
 		- "throttle_axi"	(660 only)
 		- "ispif_ahb"
+		- "camnoc_axi"		(845 only)
+		- "cpas_ahb"		(845 only)
+		- "cphy_rx_src"		(856 only)
 		- "csiphy0_timer"
+		- "csiphy0"		(845 only)
+		- "csiphy0_timer_src"	(845 only)
 		- "csiphy1_timer"
-		- "csiphy2_timer"	(8996 only)
+		- "csiphy2"		(845 only)
+		- "csiphy2_timer_src"	(845 only)
+		- "csiphy2_timer"	(8996 & 845)
+		- "csiphy3"		(845 only)
+		- "csiphy3_timer_src"	(845 only)
+		- "csiphy3_timer"	(845 only)
 		- "csiphy_ahb2crif"	(660 only)
 		- "csi0_ahb"
 		- "csi0"
 		- "csi0_phy"
 		- "csi0_pix"
 		- "csi0_rdi"
+		- "csi0_src"		(845 only)
 		- "cphy_csid0"		(660 only)
 		- "csi1_ahb"
 		- "csi1"
 		- "csi1_phy"
 		- "csi1_pix"
 		- "csi1_rdi"
+		- "csi1_src"		(845 only)
 		- "cphy_csid1"		(660 only)
 		- "csi2_ahb"		(8996 only)
 		- "csi2"		(8996 only)
 		- "csi2_phy"		(8996 only)
 		- "csi2_pix"		(8996 only)
 		- "csi2_rdi"		(8996 only)
+		- "csi2_src"		(845 only)
 		- "cphy_csid2"		(660 only)
 		- "csi3_ahb"		(8996 only)
 		- "csi3"		(8996 only)
@@ -96,14 +114,25 @@ Qualcomm Camera Subsystem
 		- "csi3_rdi"		(8996 only)
 		- "cphy_csid3"		(660 only)
 		- "ahb"
+		- "slow_ahb_src"	(845 only)
+		- "soc_ahb"		(845 only)
 		- "vfe0"
 		- "csi_vfe0"
 		- "vfe0_ahb",		(8996 only)
+		- "vfe0_cphy_rx"	(845 only)
+		- "vfe0_axi",		(845 only)
+		- "vfe0_src",		(845 only)
 		- "vfe0_stream",	(8996 only)
 		- "vfe1",		(8996 only)
 		- "csi_vfe1",		(8996 only)
 		- "vfe1_ahb",		(8996 only)
+		- "vfe1_cphy_rx"	(845 only)
+		- "vfe1_axi",		(845 only)
+		- "vfe1_src",		(845 only)
 		- "vfe1_stream",	(8996 only)
+		- "vfe_lite_axi",	(845 only)
+		- "vfe_lite_cphy_rx"	(845 only)
+		- "vfe_lite_src",	(845 only)
 		- "vfe_ahb"
 		- "vfe_axi"
 - vdda-supply:
