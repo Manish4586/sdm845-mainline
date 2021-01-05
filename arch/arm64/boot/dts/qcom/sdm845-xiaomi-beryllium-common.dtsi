@@ -235,22 +235,31 @@
 	};
 };
 
-&i2c14 {
-        status="okay";
+=======
+&i2c5 {
+	status="okay";
 
-	dmas =  <&gpi_dma1 0 6 QCOM_GPI_I2C>,
-		<&gpi_dma1 1 6 QCOM_GPI_I2C>;
+	dmas = <&gpi_dma0 0 5 QCOM_GPI_I2C>,
+	       <&gpi_dma0 1 5 QCOM_GPI_I2C>;
 	dma-names = "tx", "rx";
 
-        touchscreen: novatek@62 {
-                compatible = "novatek,nt36525"; /* Should be novatek,nt36672A instead #TODO */
-                reg = <0x62>;
-                vdd-supply = <&vreg_l14a_1p88>;
-                interrupt-parent = <&tlmm>;
-                interrupts = <31 IRQ_TYPE_EDGE_RISING>;
-                reset-gpio = <&tlmm 32 0x00 /* GPIO_ACTIVE_HIGH */ >;
-        };
-
+	/*smart PA*/
+	tas2559_codec: tas2559@4c{
+		#sound-dai-cells = <1>;
+		compatible = "ti,tas2559";
+		reg = <0x4c>;
+		ti,tas2559-reset-gpio = <&tlmm 12 0>;
+		ti,tas2560-reset-gpio = <&tlmm 76 0>;
+		ti,tas2559-irq-gpio = <&tlmm 11 0>;
+		ti,tas2560-irq-gpio = <&tlmm 30 0>;
+		ti,tas2559-addr = <0x4c>;
+		ti,tas2560-addr = <0x4d>;
+		ti,tas2559-channel = <0>; /* 0, left; 1, right */
+		ti,tas2560-channel = <1>; /* 0, left; 1, right */
+		ti,ycrc-enable = <1>; /* 0, disable; non-zero, enable */
+		ti,echo-ref = <0>; /* 0, left channel; 1, right channel; 2, both */
+		ti,bit-rate = <16>; /* 16, 20, 24, 32 */
+	};
 };
 
 &mss_pil {
@@ -428,46 +437,6 @@
 	rx {
 		pins = "gpio48";
 		bias-pull-up;
-	};
-};
-
-&dsi0 {
-	status = "okay";
-	vdda-supply = <&vdda_mipi_dsi0_1p2>;
-
-	ports {
-		port@1 {
-			endpoint {
-				remote-endpoint = <&tianma_nt36672a_in_0>;
-				data-lanes = <0 1 2 3>;
-			};
-		};
-	};
-
-	panel@0 {
-		compatible = "tianma,nt36672a";
-		reg = <0>;
-		vddi0-supply = <&vreg_l14a_1p88>;
-		vddpos-supply = <&lab>;
-		vddneg-supply = <&ibb>;
-
-		reset-gpios = <&tlmm 6 GPIO_ACTIVE_HIGH>;
-
-		pinctrl-names = "panel_active", "panel_suspend";
-		pinctrl-0 = <&sde_dsi_active>;
-		pinctrl-1 = <&sde_dsi_suspend>;
-
-		ports {
-			#address-cells = <1>;
-			#size-cells = <0>;
-
-			port@0 {
-				reg = <0>;
-				tianma_nt36672a_in_0: endpoint {
-					remote-endpoint = <&dsi0_out>;
-				};
-			};
-		};
 	};
 };
 
