@@ -20,7 +20,7 @@
 		};
 
 		pmi8998_fg: fuel_guage {
-			compatible = "qcom,pmi8998-fg";
+			compatible = "qcom,fuel-guage-v3";
 			status = "disabled";
 			#address-cells = <1>;
 			#size-cells = <0>;

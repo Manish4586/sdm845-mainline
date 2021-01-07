@@ -14,14 +14,14 @@
 #include <linux/of_irq.h>
 #include <linux/interrupt.h>
 
-#include "pmi8998_fg.h"
+#include "qcom_fg3.h"
 
 /************************
  * IO FUNCTIONS
  * **********************/
 
 /**
- * pmi8998_read() - Read multiple registers with regmap_bulk_read
+ * fg_read() - Read multiple registers with regmap_bulk_read
  * 
  * @param map The regmap to read
  * @param val Pointer to read values into
@@ -29,7 +29,7 @@
  * @param len Number of registers (bytes) to read
  * @return int 0 on success, negative errno on error
  */
-static int pmi8998_read(struct regmap *map, u8 *val, u16 addr, int len)
+static int fg_read(struct regmap *map, u8 *val, u16 addr, int len)
 {
 	if ((addr & 0xff00) == 0) {
 		pr_err("base cannot be zero base=0x%02x\n", addr);
@@ -42,7 +42,7 @@ static int pmi8998_read(struct regmap *map, u8 *val, u16 addr, int len)
 }
 
 /**
- * @brief pmi8998_write() - Write multiple registers with regmap_bulk_write
+ * @brief fg_write() - Write multiple registers with regmap_bulk_write
  * 
  * @param map The regmap to write
  * @param val Pointer to write values into
@@ -50,7 +50,7 @@ static int pmi8998_read(struct regmap *map, u8 *val, u16 addr, int len)
  * @param len Number of registers (bytes) to write
  * @return int 0 on success, negative errno on error
  */
-static int pmi8998_write(struct regmap *map, u8 *val, u16 addr, int len)
+static int fg_write(struct regmap *map, u8 *val, u16 addr, int len)
 {
 	int rc;
 	bool sec_access = (addr & 0xff) > 0xd0;
@@ -71,7 +71,7 @@ static int pmi8998_write(struct regmap *map, u8 *val, u16 addr, int len)
 }
 
 /**
- * @brief pmi8998_masked_write() - like pmi8998_write but applies
+ * @brief fg_masked_write() - like fg_write but applies
  * a mask first.
  * 
  * @param map The regmap to write
@@ -80,19 +80,19 @@ static int pmi8998_write(struct regmap *map, u8 *val, u16 addr, int len)
  * @param len Number of registers (bytes) to write
  * @return int 0 on success, negative errno on error
  */
-static int pmi8998_masked_write(struct regmap *map, u16 addr,
+static int fg_masked_write(struct regmap *map, u16 addr,
 		u8 mask, u8 val)
 {
 	int error;
 	u8 reg;
-	error = pmi8998_read(map, &reg, addr, 1);
+	error = fg_read(map, &reg, addr, 1);
 	if (error)
 		return error;
 
 	reg &= ~mask;
 	reg |= val & mask;
 
-	error = pmi8998_write(map, &reg, addr, 1);
+	error = fg_write(map, &reg, addr, 1);
 	return error;
 }
 
@@ -115,10 +115,10 @@ static int64_t twos_compliment_extend(int64_t val, int nbytes)
  * Battery Status RW
  * ***********************/
 
-static int pmi8998_fg_get_capacity(struct pmi8998_fg_chip *chip, int *val)
+static int fg_get_capacity(struct fg_chip *chip, int *val)
 {
 	u8 cap[2];
-	int error = pmi8998_read(chip->regmap, cap, REG_BASE + BATT_MONOTONIC_SOC, 2);
+	int error = fg_read(chip->regmap, cap, REG_BASE + BATT_MONOTONIC_SOC, 2);
 	if (error)
 		return error;
 	if (cap[0] != cap[1]) {
@@ -128,12 +128,12 @@ static int pmi8998_fg_get_capacity(struct pmi8998_fg_chip *chip, int *val)
 	return 0;
 }
 
-static int pmi8998_fg_get_temperature(struct pmi8998_fg_chip *chip, int *val)
+static int fg_get_temperature(struct fg_chip *chip, int *val)
 {
 	int rc, temp;
 	u8 readval[2];
 
-	rc = pmi8998_read(chip->regmap, readval, REG_BATT + PARAM_ADDR_BATT_TEMP, 2);
+	rc = fg_read(chip->regmap, readval, REG_BATT + PARAM_ADDR_BATT_TEMP, 2);
 	if (rc) {
 		pr_err("Failed to read temperature\n");
 		return rc;
@@ -146,12 +146,12 @@ static int pmi8998_fg_get_temperature(struct pmi8998_fg_chip *chip, int *val)
 	return 0;
 }
 
-static int pmi8998_fg_get_current(struct pmi8998_fg_chip *chip, int *val)
+static int fg_get_current(struct fg_chip *chip, int *val)
 {
 	int rc, temp;
 	u8 readval[2];
 
-	rc = pmi8998_read(chip->regmap, readval, REG_BATT + PARAM_ADDR_BATT_CURRENT, 2);
+	rc = fg_read(chip->regmap, readval, REG_BATT + PARAM_ADDR_BATT_CURRENT, 2);
 	if (rc) {
 		pr_err("Failed to read current\n");
 		return rc;
@@ -163,12 +163,12 @@ static int pmi8998_fg_get_current(struct pmi8998_fg_chip *chip, int *val)
 	return 0;
 }
 
-static int pmi8998_fg_get_voltage(struct pmi8998_fg_chip *chip, int *val)
+static int fg_get_voltage(struct fg_chip *chip, int *val)
 {
 	int rc, temp;
 	u8 readval[2];
 
-	rc = pmi8998_read(chip->regmap, readval, REG_BATT + PARAM_ADDR_BATT_VOLTAGE, 2);
+	rc = fg_read(chip->regmap, readval, REG_BATT + PARAM_ADDR_BATT_VOLTAGE, 2);
 	if (rc) {
 		pr_err("Failed to read voltage\n");
 		return rc;
@@ -183,13 +183,13 @@ static int pmi8998_fg_get_voltage(struct pmi8998_fg_chip *chip, int *val)
  * Init stuff
  * ******************/
 
-static int pmi8998_iacs_clear_sequence(struct pmi8998_fg_chip *chip)
+static int fg_iacs_clear_sequence(struct fg_chip *chip)
 {
 	int rc = 0;
 	u8 temp;
 
 	/* clear the error */
-	rc = pmi8998_masked_write(chip->regmap, REG_MEM + MEM_INTF_IMA_CFG,
+	rc = fg_masked_write(chip->regmap, REG_MEM + MEM_INTF_IMA_CFG,
 				BIT(2), BIT(2));
 	if (rc) {
 		pr_err("Error writing to IMA_CFG, rc=%d\n", rc);
@@ -197,26 +197,26 @@ static int pmi8998_iacs_clear_sequence(struct pmi8998_fg_chip *chip)
 	}
 
 	temp = 0x4;
-	rc = pmi8998_write(chip->regmap, &temp, REG_MEM + MEM_INTF_ADDR_LSB + 1, 1);
+	rc = fg_write(chip->regmap, &temp, REG_MEM + MEM_INTF_ADDR_LSB + 1, 1);
 	if (rc) {
 		pr_err("Error writing to MEM_INTF_ADDR_MSB, rc=%d\n", rc);
 		return rc;
 	}
 
 	temp = 0x0;
-	rc = pmi8998_write(chip->regmap, &temp, REG_MEM + MEM_INTF_WR_DATA0 + 3, 1);
+	rc = fg_write(chip->regmap, &temp, REG_MEM + MEM_INTF_WR_DATA0 + 3, 1);
 	if (rc) {
 		pr_err("Error writing to WR_DATA3, rc=%d\n", rc);
 		return rc;
 	}
 
-	rc = pmi8998_read(chip->regmap, &temp, REG_MEM + MEM_INTF_RD_DATA0 + 3, 1);
+	rc = fg_read(chip->regmap, &temp, REG_MEM + MEM_INTF_RD_DATA0 + 3, 1);
 	if (rc) {
 		pr_err("Error writing to RD_DATA3, rc=%d\n", rc);
 		return rc;
 	}
 
-	rc = pmi8998_masked_write(chip->regmap, REG_MEM + MEM_INTF_IMA_CFG,
+	rc = fg_masked_write(chip->regmap, REG_MEM + MEM_INTF_IMA_CFG,
 				BIT(2), 0);
 	if (rc) {
 		pr_err("Error writing to IMA_CFG, rc=%d\n", rc);
@@ -225,21 +225,21 @@ static int pmi8998_iacs_clear_sequence(struct pmi8998_fg_chip *chip)
 	return rc;
 }
 
-static int pmi8998_clear_ima(struct pmi8998_fg_chip *chip,
+static int fg_clear_ima(struct fg_chip *chip,
 		bool check_hw_sts)
 {
 	int rc = 0, ret = 0;
 	u8 err_sts = 0, exp_sts = 0, hw_sts = 0;
 	bool run_err_clr_seq = false;
 
-	rc = pmi8998_read(chip->regmap, &err_sts,
+	rc = fg_read(chip->regmap, &err_sts,
 			REG_MEM + MEM_INTF_IMA_ERR_STS, 1);
 	if (rc) {
 		dev_err(chip->dev, "failed to read IMA_ERR_STS, rc=%d\n", rc);
 		return rc;
 	}
 
-	rc = pmi8998_read(chip->regmap, &exp_sts,
+	rc = fg_read(chip->regmap, &exp_sts,
 			REG_MEM + MEM_INTF_IMA_EXP_STS, 1);
 	if (rc) {
 		dev_err(chip->dev, "Error in reading IMA_EXP_STS, rc=%d\n", rc);
@@ -247,7 +247,7 @@ static int pmi8998_clear_ima(struct pmi8998_fg_chip *chip,
 	}
 
 	if (check_hw_sts) {
-		rc = pmi8998_read(chip->regmap, &hw_sts,
+		rc = fg_read(chip->regmap, &hw_sts,
 				REG_MEM + MEM_INTF_IMA_HW_STS, 1);
 		if (rc) {
 			dev_err(chip->dev, "Error in reading IMA_HW_STS, rc=%d\n", rc);
@@ -272,7 +272,7 @@ static int pmi8998_clear_ima(struct pmi8998_fg_chip *chip,
 	}
 
 	if (run_err_clr_seq) {
-		ret = pmi8998_iacs_clear_sequence(chip);
+		ret = fg_iacs_clear_sequence(chip);
 		if (!ret)
 			return -EAGAIN;
 		else
@@ -282,7 +282,7 @@ static int pmi8998_clear_ima(struct pmi8998_fg_chip *chip,
 	return rc;
 }
 
-int pmi8998_get_prop_usb_online(struct pmi8998_fg_chip *chip, int *val){
+int fg_get_prop_usb_online(struct fg_chip *chip, int *val){
 	unsigned int stat;
 	int rc;
 
@@ -297,13 +297,13 @@ int pmi8998_get_prop_usb_online(struct pmi8998_fg_chip *chip, int *val){
 	return rc;
 }
 
-int pmi8998_get_prop_batt_status(struct pmi8998_fg_chip *chip, int *val){
+int fg_get_prop_batt_status(struct fg_chip *chip, int *val){
 	int usb_online_val;
 	unsigned int stat;
 	int rc;
 	bool usb_online;
 
-	rc = pmi8998_get_prop_usb_online(chip, &usb_online_val);
+	rc = fg_get_prop_usb_online(chip, &usb_online_val);
 	if (rc < 0) {
 		dev_err(chip->dev, "Couldn't get usb online property rc=%d\n", rc);
 		return rc;
@@ -346,7 +346,7 @@ int pmi8998_get_prop_batt_status(struct pmi8998_fg_chip *chip, int *val){
 	return rc;
 }
 
-int pmi8998_get_prop_health_status(struct pmi8998_fg_chip *chip, int *val){
+int fg_get_prop_health_status(struct fg_chip *chip, int *val){
 	unsigned int stat;
 	int rc;
 
@@ -370,7 +370,7 @@ int pmi8998_get_prop_health_status(struct pmi8998_fg_chip *chip, int *val){
 	return rc;
 }
 
-static int pmi8998_get_temp_threshold(struct pmi8998_fg_chip *chip,
+static int fg_get_temp_threshold(struct fg_chip *chip,
 				enum power_supply_property psp, int *val)
 {
 	int rc;
@@ -394,7 +394,7 @@ static int pmi8998_get_temp_threshold(struct pmi8998_fg_chip *chip,
 		return -EINVAL;
 	}
 
-	rc = pmi8998_read(chip->regmap, &temp, reg, 1);
+	rc = fg_read(chip->regmap, &temp, reg, 1);
 	if (rc < 0) {
 		dev_err(chip->dev, "Error in reading jeita level for psp:%d, rc=%d\n", psp, rc);
 		return rc;
@@ -405,7 +405,7 @@ static int pmi8998_get_temp_threshold(struct pmi8998_fg_chip *chip,
 	return 0;
 }
 
-static void fg_get_model_name(struct pmi8998_fg_chip *chip, union power_supply_propval *val)
+static void fg_get_model_name(struct fg_chip *chip, union power_supply_propval *val)
 {
 	switch (chip->subtype)
 	{
@@ -425,7 +425,7 @@ static int fg_get_property(struct power_supply *psy,
 		enum power_supply_property psp,
 		union power_supply_propval *val)
 {
-	struct pmi8998_fg_chip *chip = power_supply_get_drvdata(psy);
+	struct fg_chip *chip = power_supply_get_drvdata(psy);
 	int error = 0;
 
 	dev_dbg(chip->dev, "Getting property: %d", psp);
@@ -441,13 +441,13 @@ static int fg_get_property(struct power_supply *psy,
 		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
-		error = pmi8998_fg_get_capacity(chip, &val->intval);
+		error = fg_get_capacity(chip, &val->intval);
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
-		error = pmi8998_fg_get_current(chip, &val->intval);
+		error = fg_get_current(chip, &val->intval);
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-		error = pmi8998_fg_get_voltage(chip, &val->intval);
+		error = fg_get_voltage(chip, &val->intval);
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
 	case POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN:
@@ -458,23 +458,23 @@ static int fg_get_property(struct power_supply *psy,
 		val->intval = chip->batt_max_voltage_uv;
 		break;
 	case POWER_SUPPLY_PROP_STATUS:
-		error = pmi8998_get_prop_batt_status(chip, &val->intval);
+		error = fg_get_prop_batt_status(chip, &val->intval);
 		break;
 	case POWER_SUPPLY_PROP_HEALTH:
-		error = pmi8998_get_prop_health_status(chip, &val->intval);
+		error = fg_get_prop_health_status(chip, &val->intval);
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
 	case POWER_SUPPLY_PROP_CHARGE_FULL: /* TODO: Implement capacity learning */
 		val->intval = chip->batt_cap_uah;
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
-		error = pmi8998_fg_get_temperature(chip, &val->intval);
+		error = fg_get_temperature(chip, &val->intval);
 		break;
 	case POWER_SUPPLY_PROP_TEMP_MIN:
 	case POWER_SUPPLY_PROP_TEMP_MAX:
 	case POWER_SUPPLY_PROP_TEMP_ALERT_MIN:
 	case POWER_SUPPLY_PROP_TEMP_ALERT_MAX:
-		error = pmi8998_get_temp_threshold(chip, psp, &val->intval);
+		error = fg_get_temp_threshold(chip, psp, &val->intval);
 		break;
 	//POWER_SUPPLY_PROP_TIME_TO_FULL_NOW,POWER_SUPPLY_PROP_TIME_TO_FULL_AVG - calculate time remaining for full charge - implementable
 	//POWER_SUPPLY_PROP_TIME_TO_EMPTY_NOW,POWER_SUPPLY_PROP_TIME_TO_EMPTY_AVG - calculate time remaining when discharging - implementable
@@ -500,8 +500,8 @@ static const struct power_supply_desc bms_psy_desc = {
 	.get_property = fg_get_property,
 };
 
-irqreturn_t pmi8998_handle_usb_plugin(int irq, void *data){
-	struct pmi8998_fg_chip *chip = data;
+irqreturn_t fg_handle_usb_plugin(int irq, void *data){
+	struct fg_chip *chip = data;
 	int rc;
 	unsigned int stat;
 	bool vbus_rising;
@@ -527,10 +527,10 @@ irqreturn_t pmi8998_handle_usb_plugin(int irq, void *data){
 	return IRQ_HANDLED;
 }
 
-static int pmi8998_fg_probe(struct platform_device *pdev)
+static int fg_probe(struct platform_device *pdev)
 {
 	struct power_supply_config supply_config = {};
-	struct pmi8998_fg_chip *chip;
+	struct fg_chip *chip;
 	const __be32 *prop_addr;
 	int rc = 0, irq;
 	u8 dma_status;
@@ -587,7 +587,7 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	}
 
 	// Init memif fn inlined here (chip hardware info)
-	rc = pmi8998_read(chip->regmap, chip->revision, REG_MEM + DIG_MINOR, 4);
+	rc = fg_read(chip->regmap, chip->revision, REG_MEM + DIG_MINOR, 4);
 	if (rc) {
 		dev_err(chip->dev, "Unable to read FG revision rc=%d\n", rc);
 		return rc;
@@ -599,7 +599,7 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 		return rc;
 	}
 
-	dev_dbg(chip->dev, "pmi8998 revision DIG:%d.%d ANA:%d.%d\n",
+	dev_dbg(chip->dev, "fg revision DIG:%d.%d ANA:%d.%d\n",
 		chip->revision[DIG_MAJOR], chip->revision[DIG_MINOR],
 		chip->revision[ANA_MAJOR], chip->revision[ANA_MINOR]);
 	
@@ -609,7 +609,7 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	 * that the next transaction starts only after the hw is ready.
 	 * IACS_INTR_SRC_SLCT is BIT(3)
 	 */
-	rc = pmi8998_masked_write(chip->regmap,
+	rc = fg_masked_write(chip->regmap,
 		REG_MEM + MEM_INTF_IMA_CFG, BIT(3), BIT(3));
 	if (rc) {
 		dev_err(chip->dev,
@@ -618,21 +618,21 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 		return rc;
 	}
 
-	rc = pmi8998_clear_ima(chip, true);
+	rc = fg_clear_ima(chip, true);
 	if (rc && rc != -EAGAIN) {
 		dev_err(chip->dev, "Error clearing IMA, exception rc=%d", rc);
 		return rc;
 	}
 
 	// Check and clear DMA errors
-	rc = pmi8998_read(chip->regmap, &dma_status, REG_MEM + 0x70, 1);
+	rc = fg_read(chip->regmap, &dma_status, REG_MEM + 0x70, 1);
 	if (rc < 0) {
 		pr_err("failed to read dma_status, rc=%d\n", rc);
 		return rc;
 	}
 
 	error_present = dma_status & (BIT(1) | BIT(2));
-	rc = pmi8998_masked_write(chip->regmap, REG_MEM + 0x71, BIT(0),
+	rc = fg_masked_write(chip->regmap, REG_MEM + 0x71, BIT(0),
 			error_present ? BIT(0) : 0);
 	if (rc < 0) {
 		pr_err("failed to write dma_ctl, rc=%d\n", rc);
@@ -658,7 +658,7 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	}
 
 	rc = devm_request_threaded_irq(chip->dev, irq, NULL,
-					pmi8998_handle_usb_plugin,
+					fg_handle_usb_plugin,
 					IRQF_ONESHOT, "usb-plugin", chip);
 	if (rc < 0) {
 		pr_err("Couldn't request irq %d\n", irq);
@@ -668,22 +668,22 @@ static int pmi8998_fg_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int pmi8998_fg_remove(struct platform_device *pdev)
+static int fg_remove(struct platform_device *pdev)
 {
 	return 0;
 }
 
 static const struct of_device_id fg_match_id_table[] = {
-	{ .compatible = "qcom,pmi8998-fg" },
+	{ .compatible = "qcom,fuel-guage-v3" },
 	{ /* sentinal */ }
 };
 MODULE_DEVICE_TABLE(of, fg_match_id_table);
 
 static struct platform_driver qcom_fg_driver = {
-	.probe = pmi8998_fg_probe,
-	.remove = pmi8998_fg_remove,
+	.probe = fg_probe,
+	.remove = fg_remove,
 	.driver = {
-		.name = "pmi8998-fg",
+		.name = "qcom-fuel-guage-v3",
 		.of_match_table = fg_match_id_table,
 	},
 };
@@ -692,5 +692,5 @@ module_platform_driver(qcom_fg_driver);
 
 MODULE_AUTHOR("Caleb Connolly <caleb@connolly.tech>");
 MODULE_AUTHOR("Joel Selvaraj <jo@jsfamily.in>");
-MODULE_DESCRIPTION("Qualcomm PMI8998 Fuel Guage Driver");
+MODULE_DESCRIPTION("Qualcomm Fuel Guage v3 Driver");
 MODULE_LICENSE("GPL v2");
