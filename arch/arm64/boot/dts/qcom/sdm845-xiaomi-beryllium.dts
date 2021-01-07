@@ -377,7 +377,9 @@
 	model = "Xiaomi Poco F1";
 	audio-routing =
 		"RX_BIAS", "MCLK",
+		"AMIC1", "MIC BIAS1",
 		"AMIC2", "MIC BIAS2",
+		"AMIC3", "MIC BIAS3",
 		"MM_DL1",  "MultiMedia1 Playback",
 		"MM_DL2",  "MultiMedia2 Playback",
 		"MultiMedia3 Capture", "MM_UL3";
@@ -557,6 +559,10 @@
 	vdd-tx-supply = <&vreg_s4a_1p8>;
 	vdd-rx-supply = <&vreg_s4a_1p8>;
 	vdd-io-supply = <&vreg_s4a_1p8>;
+	qcom,micbias1-microvolt = <2700000>;
+    qcom,micbias2-microvolt = <1800000>;
+    qcom,micbias3-microvolt = <2700000>;
+    qcom,micbias4-microvolt = <2700000>;
 };
 
 &wifi {
