@@ -171,6 +171,11 @@ properties:
           - enum:
               - qcom,ipq6018-cp01-c1
           - const: qcom,ipq6018
+      - items:
+          - enum:
+              - oneplus,enchilada
+              - oneplus,fajita
+          - const: qcom,sdm845
 
       - items:
           - enum:
