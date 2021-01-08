@@ -25,6 +25,7 @@ struct sofef00_panel {
 	struct regulator *supply;
 	struct gpio_desc *reset_gpio;
 	const struct drm_display_mode *mode;
+	bool alternate_on_seq;
 	bool prepared;
 };
 
@@ -92,6 +93,81 @@ static int sofef00_panel_on(struct sofef00_panel *ctx)
 	return 0;
 }
 
+static int s6e3fc2x01_panel_on(struct sofef00_panel *ctx)
+{
+	struct mipi_dsi_device *dsi = ctx->dsi;
+	struct device *dev = &dsi->dev;
+	int ret;
+
+	dsi_dcs_write_seq(dsi, 0x9f, 0xa5, 0xa5);
+
+	ret = mipi_dsi_dcs_exit_sleep_mode(dsi);
+	if (ret < 0) {
+		dev_err(dev, "Failed to exit sleep mode: %d\n", ret);
+		return ret;
+	}
+	usleep_range(10000, 11000);
+
+	dsi_dcs_write_seq(dsi, 0x9f, 0x5a, 0x5a);
+	dsi_dcs_write_seq(dsi, 0xf0, 0x5a, 0x5a);
+	dsi_dcs_write_seq(dsi, 0xb0, 0x01);
+	dsi_dcs_write_seq(dsi, 0xcd, 0x01);
+	dsi_dcs_write_seq(dsi, 0xf0, 0xa5, 0xa5);
+	usleep_range(15000, 16000);
+	dsi_dcs_write_seq(dsi, 0x9f, 0xa5, 0xa5);
+
+	ret = mipi_dsi_dcs_set_tear_on(dsi, MIPI_DSI_DCS_TEAR_MODE_VBLANK);
+	if (ret < 0) {
+		dev_err(dev, "Failed to set tear on: %d\n", ret);
+		return ret;
+	}
+
+	dsi_dcs_write_seq(dsi, 0x9f, 0x5a, 0x5a);
+	dsi_dcs_write_seq(dsi, 0xf0, 0x5a, 0x5a);
+	dsi_dcs_write_seq(dsi, 0xeb, 0x17, 0x41, 0x92, 0x0e, 0x10, 0x82, 0x5a);
+	dsi_dcs_write_seq(dsi, 0xf0, 0xa5, 0xa5);
+
+	ret = mipi_dsi_dcs_set_column_address(dsi, 0x0000, 0x0437);
+	if (ret < 0) {
+		dev_err(dev, "Failed to set column address: %d\n", ret);
+		return ret;
+	}
+
+	ret = mipi_dsi_dcs_set_page_address(dsi, 0x0000, 0x0923);
+	if (ret < 0) {
+		dev_err(dev, "Failed to set page address: %d\n", ret);
+		return ret;
+	}
+
+	dsi_dcs_write_seq(dsi, 0xf0, 0x5a, 0x5a);
+	dsi_dcs_write_seq(dsi, 0xb0, 0x09);
+	dsi_dcs_write_seq(dsi, 0xe8, 0x10, 0x30);
+	dsi_dcs_write_seq(dsi, 0xf0, 0xa5, 0xa5);
+	dsi_dcs_write_seq(dsi, 0xf0, 0x5a, 0x5a);
+	dsi_dcs_write_seq(dsi, 0xb0, 0x07);
+	dsi_dcs_write_seq(dsi, 0xb7, 0x01);
+	dsi_dcs_write_seq(dsi, 0xb0, 0x08);
+	dsi_dcs_write_seq(dsi, 0xb7, 0x12);
+	dsi_dcs_write_seq(dsi, 0xf0, 0xa5, 0xa5);
+	dsi_dcs_write_seq(dsi, 0xfc, 0x5a, 0x5a);
+	dsi_dcs_write_seq(dsi, 0xb0, 0x01);
+	dsi_dcs_write_seq(dsi, 0xe3, 0x88);
+	dsi_dcs_write_seq(dsi, 0xb0, 0x07);
+	dsi_dcs_write_seq(dsi, 0xed, 0x67);
+	dsi_dcs_write_seq(dsi, 0xfc, 0xa5, 0xa5);
+	dsi_dcs_write_seq(dsi, 0xf0, 0x5a, 0x5a);
+	dsi_dcs_write_seq(dsi, MIPI_DCS_WRITE_CONTROL_DISPLAY, 0x20);
+	dsi_dcs_write_seq(dsi, 0xf0, 0xa5, 0xa5);
+	dsi_dcs_write_seq(dsi, MIPI_DCS_WRITE_POWER_SAVE, 0x00);
+	usleep_range(1000, 2000);
+	dsi_dcs_write_seq(dsi, 0xf0, 0x5a, 0x5a);
+	dsi_dcs_write_seq(dsi, 0xb3, 0x00, 0xc1);
+	dsi_dcs_write_seq(dsi, 0xf0, 0xa5, 0xa5);
+
+	return 0;
+
+}
+
 static int sofef00_panel_off(struct sofef00_panel *ctx)
 {
 	struct mipi_dsi_device *dsi = ctx->dsi;
@@ -134,7 +210,10 @@ static int sofef00_panel_prepare(struct drm_panel *panel)
 
 	sofef00_panel_reset(ctx);
 
-	ret = sofef00_panel_on(ctx);
+	ret = ctx->alternate_on_seq
+		? s6e3fc2x01_panel_on(ctx)
+		: sofef00_panel_on(ctx);
+
 	if (ret < 0) {
 		dev_err(dev, "Failed to initialize panel: %d\n", ret);
 		gpiod_set_value_cansleep(ctx->reset_gpio, 1);
@@ -263,6 +342,12 @@ static int sofef00_panel_probe(struct mipi_dsi_device *dsi)
 		return -ENOMEM;
 
 	ctx->mode = of_device_get_match_data(dev);
+	if (ctx->mode->vdisplay == fajita_panel_mode.vdisplay) {
+		dev_info(dev, "Fajita panel mode!");
+		ctx->alternate_on_seq = true;
+	} else {
+		ctx->alternate_on_seq = false;
+	}
 
 	if (!ctx->mode) {
 		dev_err(dev, "Missing device mode\n");
