@@ -36,7 +36,7 @@ static int pmi8998_read(struct regmap *map, u8 *val, u16 addr, int len)
 		return -EINVAL;
 	}
 
-	pr_info("%s: reading 0x%x bytes from 0x%x", __func__, len, addr);
+	//pr_info("%s: reading 0x%x bytes from 0x%x", __func__, len, addr);
 
 	return regmap_bulk_read(map, addr, val, len);
 }
