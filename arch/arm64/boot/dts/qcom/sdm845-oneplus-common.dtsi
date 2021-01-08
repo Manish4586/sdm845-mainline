@@ -431,6 +431,8 @@
 
 &pmi8998_fg {
 	status = "okay";
+	qcom,max-voltage-uv = <4400000>;
+	qcom,min-voltage-uv = <3700000>;
 };
 
 &gcc {
@@ -759,7 +761,7 @@
 		config {
 			pins = "gpio6", "gpio25", "gpio26";
 			drive-strength = <8>;
-			bias-disable = <0>;
+			bias-disable;
 		};
 	};
 
