@@ -33,6 +33,7 @@
 #include <linux/of_gpio.h>
 #include <linux/slab.h>
 #include <linux/syscalls.h>
+#include <linux/fdtable.h>
 #include <linux/fcntl.h>
 #include <linux/uaccess.h>
 #include <linux/crc8.h>
@@ -2539,7 +2540,7 @@ static int tas2559_load_calibration(struct tas2559_priv *pTAS2559,	char *pFileNa
 {
 	int nResult = 0;
 	int nFile;
-	mm_segment_t fs;
+	// mm_segment_t fs;
 	unsigned char pBuffer[1000];
 	int nSize = 0;
 
@@ -2549,8 +2550,8 @@ static int tas2559_load_calibration(struct tas2559_priv *pTAS2559,	char *pFileNa
 
 	dev_dbg(pTAS2559->dev, "%s:\n", __func__);
 
-	fs = get_fs();
-	set_fs(KERNEL_DS);
+	// fs = get_fs();
+	// set_fs(KERNEL_DS);
 	nFile = do_sys_open(AT_FDCWD, pFileName, O_RDONLY, 0);
 
 	dev_info(pTAS2559->dev, "TAS2559 calibration file = %s, handle = %d\n",
@@ -2558,14 +2559,14 @@ static int tas2559_load_calibration(struct tas2559_priv *pTAS2559,	char *pFileNa
 
 	if (nFile >= 0) {
 		nSize = ksys_read(nFile, pBuffer, 1000);
-		ksys_close(nFile);
+		close_fd(nFile);
 	} else {
 		dev_err(pTAS2559->dev, "TAS2559 cannot open calibration file: %s\n",
 			pFileName);
 		nResult = -EINVAL;
 	}
 
-	set_fs(fs);
+	// set_fs(fs);
 
 	if (!nSize)
 		goto end;
