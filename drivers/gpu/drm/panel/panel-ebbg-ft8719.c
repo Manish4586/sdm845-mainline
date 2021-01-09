@@ -16,6 +16,8 @@
 #include <linux/pinctrl/consumer.h>
 #include <linux/regulator/consumer.h>
 
+#include <linux/backlight.h>
+
 #include <drm/drm_device.h>
 #include <drm/drm_mipi_dsi.h>
 #include <drm/drm_modes.h>
@@ -469,6 +471,41 @@ static void panel_del(struct panel_info *pinfo)
 		drm_panel_remove(&pinfo->base);
 }
 
+
+static int ebbg_panel_bl_update_status(struct backlight_device *bl)
+{
+	struct mipi_dsi_device *dsi = bl_get_data(bl);
+	int err;
+	u8 brightness;
+
+	brightness = (u8)backlight_get_brightness(bl);
+
+	err = mipi_dsi_dcs_set_display_brightness(dsi, brightness);
+	if (err < 0)
+		return err;
+
+	return 0;
+}
+
+static const struct backlight_ops ebbg_panel_bl_ops = {
+	.update_status = ebbg_panel_bl_update_status,
+};
+
+static struct backlight_device *
+ebbg_create_backlight(struct mipi_dsi_device *dsi)
+{
+	struct device *dev = &dsi->dev;
+	const struct backlight_properties props = {
+		.type = BACKLIGHT_PLATFORM,
+		.brightness = 255,
+		.max_brightness = 255,
+	};
+
+	return devm_backlight_device_register(dev, dev_name(dev), dev, dsi,
+						&ebbg_panel_bl_ops, &props);
+}
+
+
 static int panel_probe(struct mipi_dsi_device *dsi)
 {
 	struct panel_info *pinfo;
@@ -487,6 +524,12 @@ static int panel_probe(struct mipi_dsi_device *dsi)
 	pinfo->link = dsi;
 
 	mipi_dsi_set_drvdata(dsi, pinfo);
+
+
+	pinfo->base.backlight = ebbg_create_backlight(dsi);
+	if (IS_ERR(pinfo->base.backlight))
+		return dev_err_probe(&dsi->dev, PTR_ERR(pinfo->base.backlight),
+					"Failed to create backlight\n");
 
 	err = panel_add(pinfo);
 	if (err < 0)
