@@ -11,6 +11,7 @@
 #define QC_MSM_CAMSS_CSID_H
 
 #include <linux/clk.h>
+#include <linux/irq.h>
 #include <media/media-entity.h>
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-device.h>
