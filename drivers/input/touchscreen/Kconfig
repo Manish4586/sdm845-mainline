@@ -12,8 +12,6 @@ menuconfig INPUT_TOUCHSCREEN
 
 if INPUT_TOUCHSCREEN
 
-source "drivers/input/touchscreen/focaltech_touch/Kconfig"
-
 config TOUCHSCREEN_PROPERTIES
 	def_tristate INPUT
 	depends on INPUT
@@ -377,6 +375,14 @@ config TOUCHSCREEN_EXC3000
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called exc3000.
+
+menuconfig TOUCHSCREEN_FTS
+	bool "Focaltech Touchscreen"
+	depends on I2C
+	default n
+	help
+	  Say Y here if you have Focaltech touch panel.
+	  If unsure, say N.
 
 config TOUCHSCREEN_FUJITSU
 	tristate "Fujitsu serial touchscreen"
