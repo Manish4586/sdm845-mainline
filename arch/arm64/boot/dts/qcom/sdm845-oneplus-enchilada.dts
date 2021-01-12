@@ -21,3 +21,41 @@
 
 	compatible = "samsung,sofef00";
 };
+
+&sound {
+	model = "OnePlus6";
+	audio-routing =	"RX_BIAS", "MCLK",
+			"AMIC2", "MIC BIAS2",
+			"AMIC3", "MIC BIAS4",
+			"AMIC4", "MIC BIAS1",
+			"AMIC5", "MIC BIAS4",
+			"DMIC0", "MIC BIAS1",
+			"DMIC1", "MIC BIAS1",
+			"DMIC2", "MIC BIAS3",
+			"DMIC3", "MIC BIAS3",
+			"DMIC4", "MIC BIAS4",
+			"DMIC5", "MIC BIAS4",
+			//"MM_DL1", "MultiMedia1 Playback",
+			//"MM_DL2", "MultiMedia2 Playback",
+			"MultiMedia3 Capture", "MM_UL3",
+			"MM_DL4", "MultiMedia4 Playback",
+			"MM_DL5", "MultiMedia5 Playback",
+			"MM_DL6", "MultiMedia6 Playback",
+			"MM_DL7", "MultiMedia7 Playback";
+			//"MM_DL8", "MultiMedia8 Playback";
+
+	// max98927-dai-link {
+	// 	link-name = "Speaker Playback";
+	// 	cpu {
+	// 		sound-dai = <&q6afedai QUATERNARY_MI2S_RX>;
+	// 	};
+
+	// 	platform {
+	// 		sound-dai = <&q6routing>;
+	// 	};
+
+	// 	codec {
+	// 		sound-dai = <&max98927_codec 0>;
+	// 	};
+	// };
+};
