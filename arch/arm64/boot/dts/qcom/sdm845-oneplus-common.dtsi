@@ -14,8 +14,6 @@
 #include <dt-bindings/sound/qcom,q6asm.h>
 
 #include "sdm845.dtsi"
-
-// Needed for some GPIO (like the volume buttons)
 #include "pm8998.dtsi"
 #include "pmi8998.dtsi"
 
@@ -51,6 +49,8 @@
 
 	/*
 	 * The touchscreen regulator seems to be controlled somehow by a gpio.
+	 * Model it as a fixed regulator and keep it on. Without schematics we
+	 * don't know how this is actually wired up...
 	 */
 	ts_1p8_supply: ts_1v8_regulator {
 		compatible = "regulator-fixed";
@@ -85,11 +85,6 @@
 			gpios = <&pm8998_gpio 6 GPIO_ACTIVE_LOW>;
 			debounce-interval = <15>;
 		};
-	};
-
-	extcon_usb1_detect: extcon-usb-1 {
-		compatible = "linux,extcon-usb-gpio";
-		id-gpio = <&tlmm 38 GPIO_ACTIVE_HIGH>;
 	};
 };
 
@@ -147,7 +142,6 @@
 		};
 
 		vdd_qusb_hs0:
-		vdda_hp_pcie_core:
 		vdda_mipi_csi0_0p9:
 		vdda_mipi_csi1_0p9:
 		vdda_mipi_csi2_0p9:
@@ -232,8 +226,6 @@
 
 		vdd_qfprom:
 		vdd_qfprom_sp:
-		vdda_apc1_cs_1p8:
-		vdda_gfx_cs_1p8:
 		vdda_qrefs_1p8:
 		vdda_qusb_hs0_1p8:
 		vddpx_11:
@@ -324,11 +316,6 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 		};
 
-		vdda_hp_pcie_1p2:
-		vdda_hv_ebi0:
-		vdda_hv_ebi1:
-		vdda_hv_ebi2:
-		vdda_hv_ebi3:
 		vdda_mipi_csi_1p25:
 		vdda_mipi_dsi0_1p2:
 		vdda_mipi_dsi1_1p2:
@@ -410,13 +397,12 @@
 		};
 
 		/*
-		 * This must be reserved as the device will
-		 * crash if memory is allocated here due to
-		 * vendor quirks.
+		 * It seems like reserving the old rmtfs_mem region is also needed to prevent
+		 * random crashes which are most likely modem related, more testing needed.
 		 */
 		removed_region: memory@88f00000 {
 			no-map;
-			reg = <0 0x88f00000 0 0x1c00000>;
+			reg = <0 0x88f00000 0 0x200000>;
 		};
 
 		ramoops: ramoops@ac300000 {
@@ -621,7 +607,8 @@
 	bluetooth {
 		compatible = "qcom,wcn3990-bt";
 
-		/* This path is relative to the qca/
+		/*
+		 * This path is relative to the qca/
 		 * subdir under lib/firmware.
 		 */
 		firmware-name = "oneplus6/crnv21.bin";
@@ -634,6 +621,7 @@
 	};
 };
 
+// Prevent garbage data on bluetooth UART lines
 &qup_uart6_default {
 	pinmux {
 		pins = "gpio45", "gpio46", "gpio47", "gpio48";
@@ -691,8 +679,6 @@
 
 	/* fastest mode for USB 2 */
 	maximum-speed = "high-speed";
-
-	extcon = <&extcon_usb1_detect>;
 
 	/* Remove USB3 phy as it's unused on this device. */
 	phys = <&usb_1_hsphy>;
@@ -820,9 +806,6 @@
 	mux {
 		pins = "gpio49", "gpio50";
 		function = "qup12";
-	};
-	config {
-		pins = "gpio49", "gpio50";
 		drive-strength = <2>;
 		bias-disable;
 	};
@@ -905,10 +888,6 @@
 		mux {
 			pins = "gpio40", "gpio42", "gpio26";
 			function = "gpio";
-		};
-
-		config {
-			pins = "gpio40", "gpio42", "gpio26";
 			drive-strength = <2>;
 			bias-disable;
 		};
@@ -918,10 +897,6 @@
 		mux {
 			pins = "gpio99", "gpio125";
 			function = "gpio";
-		};
-
-		config {
-			pins = "gpio99", "gpio125";
 			drive-strength = <16>;
 			bias-pull-up;
 		};
@@ -931,10 +906,6 @@
 		mux {
 			pins = "gpio6", "gpio25", "gpio26";
 			function = "gpio";
-		};
-
-		config {
-			pins = "gpio6", "gpio25", "gpio26";
 			drive-strength = <8>;
 			bias-disable;
 		};
@@ -944,10 +915,6 @@
 		mux {
 			pins = "gpio10";
 			function = "mdp_vsync";
-		};
-
-		config {
-			pins = "gpio10";
 			drive-strength = <2>;
 			bias-disable;
 			input-enable;
