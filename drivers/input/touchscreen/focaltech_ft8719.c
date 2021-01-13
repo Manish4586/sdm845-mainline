@@ -32,7 +32,7 @@
 /*****************************************************************************
 * Included header files
 *****************************************************************************/
-#include "focaltech_core.h"
+#include "focaltech_ft8719.h"
 #ifdef CONFIG_DRM
 #include <linux/notifier.h>
 #include <linux/fb.h>
@@ -1939,9 +1939,9 @@ static struct i2c_driver fts_ts_driver = {
 	.driver = {
 		   .name = FTS_DRIVER_NAME,
 		   .owner = THIS_MODULE,
-#ifdef CONFIG_PM
-		   .pm = &fts_dev_pm_ops,
-#endif
+//#ifdef CONFIG_PM
+//		   .pm = &fts_dev_pm_ops,
+//#endif
 		   .of_match_table = fts_match_table,
 		   },
 	.id_table = fts_ts_id,
