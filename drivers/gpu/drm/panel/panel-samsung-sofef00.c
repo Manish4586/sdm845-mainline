@@ -25,6 +25,7 @@ struct sofef00_panel {
 	struct regulator *supply;
 	struct gpio_desc *reset_gpio;
 	const struct drm_display_mode *mode;
+	bool is_fajita_panel;
 	bool prepared;
 };
 
@@ -132,7 +133,8 @@ static int sofef00_panel_prepare(struct drm_panel *panel)
 		return ret;
 	}
 
-	sofef00_panel_reset(ctx);
+	if (!ctx->is_fajita_panel)
+		sofef00_panel_reset(ctx);
 
 	ret = sofef00_panel_on(ctx);
 	if (ret < 0) {
@@ -155,8 +157,14 @@ static int sofef00_panel_unprepare(struct drm_panel *panel)
 		return 0;
 
 	ret = sofef00_panel_off(ctx);
-	if (ret < 0)
+
+	if (ret < 0) {
 		dev_err(dev, "Failed to un-initialize panel: %d\n", ret);
+		return ret;
+	}
+
+	if (!ctx->is_fajita_panel)
+		gpiod_set_value_cansleep(ctx->reset_gpio, 1);
 
 	regulator_disable(ctx->supply);
 
@@ -269,6 +277,8 @@ static int sofef00_panel_probe(struct mipi_dsi_device *dsi)
 		return -ENODEV;
 	}
 
+	ctx->is_fajita_panel = (ctx->mode->vdisplay == fajita_panel_mode.vdisplay);
+
 	ctx->supply = devm_regulator_get(dev, "vddio");
 	if (IS_ERR(ctx->supply)) {
 		ret = PTR_ERR(ctx->supply);
@@ -276,7 +286,9 @@ static int sofef00_panel_probe(struct mipi_dsi_device *dsi)
 		return ret;
 	}
 
-	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
+	// Must be GPIOD_OUT_LOW to make sure we don't put the panel in reset
+	// when we get a handle to it.
+	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
 	if (IS_ERR(ctx->reset_gpio)) {
 		ret = PTR_ERR(ctx->reset_gpio);
 		dev_warn(dev, "Failed to get reset-gpios: %d\n", ret);
