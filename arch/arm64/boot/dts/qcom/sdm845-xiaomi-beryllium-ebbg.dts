@@ -105,13 +105,25 @@
 };
 
 &i2c14 {
+
+//	compatible = "i2c-gpio";
+
 	status="okay";
+
+	clock-frequency = <400000>; //REALLY?
 
 	dmas =  <&gpi_dma1 0 6 QCOM_GPI_I2C>,
 		<&gpi_dma1 1 6 QCOM_GPI_I2C>;
 	dma-names = "tx", "rx";
 
-	touchscreen: focaltech@38 {
+//	sda-gpios = <&tlmm 33 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+//	scl-gpios = <&tlmm 34 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+//	i2c-gpio,delay-us = <5>;	/* 5~=100 kHz */ /* could probably run on higher speeds */
+//	#address-cells = <1>;
+//	#size-cells = <0>;
+
+
+/*	touchscreen: focaltech@38 {
 		compatible = "focaltech,fts";
 		reg = <0x38>;
 		interrupt-parent = <&tlmm>;
@@ -127,5 +139,5 @@
 		pinctrl-names = "pmx_ts_active", "pmx_ts_suspend";
 		pinctrl-0 = <&ts_int_active &ts_reset_active>;
 		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
-	};
+	}; */
 };

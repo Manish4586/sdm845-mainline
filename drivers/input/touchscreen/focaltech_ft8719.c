@@ -1576,6 +1576,8 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	struct fts_ts_data *ts_data;
 	struct dentry *tp_debugfs;
 
+	FTS_ERROR("Hallo???");
+
 	FTS_FUNC_ENTER();
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		FTS_ERROR("I2C not supported");
@@ -1954,7 +1956,7 @@ static struct i2c_driver fts_ts_driver = {
 *  Output:
 *  Return:
 *****************************************************************************/
-static int __init fts_ts_init(void)
+/*static int __init fts_ts_init(void)
 {
 	int ret = 0;
 
@@ -1966,7 +1968,7 @@ static int __init fts_ts_init(void)
 	FTS_FUNC_EXIT();
 	return ret;
 }
-
+*/
 /*****************************************************************************
 *  Name: fts_ts_exit
 *  Brief:
@@ -1974,13 +1976,16 @@ static int __init fts_ts_init(void)
 *  Output:
 *  Return:
 *****************************************************************************/
-static void __exit fts_ts_exit(void)
+/*static void __exit fts_ts_exit(void)
 {
 	i2c_del_driver(&fts_ts_driver);
 }
 
 module_init(fts_ts_init);
 module_exit(fts_ts_exit);
+*/
+
+module_i2c_driver(fts_ts_driver);
 
 MODULE_AUTHOR("FocalTech Driver Team");
 MODULE_DESCRIPTION("FocalTech Touchscreen Driver");
