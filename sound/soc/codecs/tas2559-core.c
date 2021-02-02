@@ -43,8 +43,8 @@
 #define TAS2559_CAL_NAME    "/vendor/firmware/qcom/sdm845/tas2559_cal.bin"
 #define RESTART_MAX 3
 
-static int tas2559_load_calibration(struct tas2559_priv *pTAS2559,
-				    char *pFileName);
+// static int tas2559_load_calibration(struct tas2559_priv *pTAS2559,
+// 				    char *pFileName);
 static int tas2559_load_data(struct tas2559_priv *pTAS2559, struct TData *pData,
 			     unsigned int nType);
 static void tas2559_clear_firmware(struct TFirmware *pFirmware);
@@ -2535,55 +2535,55 @@ void tas2559_clear_firmware(struct TFirmware *pFirmware)
 	memset(pFirmware, 0x00, sizeof(struct TFirmware));
 }
 
-static int tas2559_load_calibration(struct tas2559_priv *pTAS2559,	char *pFileName)
-{
-	int nResult = 0;
-	int nFile;
-	mm_segment_t fs;
-	unsigned char pBuffer[1000];
-	int nSize = 0;
+// static int tas2559_load_calibration(struct tas2559_priv *pTAS2559,	char *pFileName)
+// {
+// 	int nResult = 0;
+// 	int nFile;
+// 	mm_segment_t fs;
+// 	unsigned char pBuffer[1000];
+// 	int nSize = 0;
 
-	int flags = O_RDONLY;
-	if (force_o_largefile())
-		flags |= O_LARGEFILE;
+// 	int flags = O_RDONLY;
+// 	if (force_o_largefile())
+// 		flags |= O_LARGEFILE;
 
-	dev_dbg(pTAS2559->dev, "%s:\n", __func__);
+// 	dev_dbg(pTAS2559->dev, "%s:\n", __func__);
 
-	fs = get_fs();
-	set_fs(KERNEL_DS);
-	nFile = do_sys_open(AT_FDCWD, pFileName, O_RDONLY, 0);
+// 	fs = get_fs();
+// 	set_fs(KERNEL_DS);
+// 	nFile = do_sys_open(AT_FDCWD, pFileName, O_RDONLY, 0);
 
-	dev_info(pTAS2559->dev, "TAS2559 calibration file = %s, handle = %d\n",
-		 pFileName, nFile);
+// 	dev_info(pTAS2559->dev, "TAS2559 calibration file = %s, handle = %d\n",
+// 		 pFileName, nFile);
 
-	if (nFile >= 0) {
-		nSize = ksys_read(nFile, pBuffer, 1000);
-		ksys_close(nFile);
-	} else {
-		dev_err(pTAS2559->dev, "TAS2559 cannot open calibration file: %s\n",
-			pFileName);
-		nResult = -EINVAL;
-	}
+// 	if (nFile >= 0) {
+// 		nSize = ksys_read(nFile, pBuffer, 1000);
+// 		ksys_close(nFile);
+// 	} else {
+// 		dev_err(pTAS2559->dev, "TAS2559 cannot open calibration file: %s\n",
+// 			pFileName);
+// 		nResult = -EINVAL;
+// 	}
 
-	set_fs(fs);
+// 	set_fs(fs);
 
-	if (!nSize)
-		goto end;
+// 	if (!nSize)
+// 		goto end;
 
-	tas2559_clear_firmware(pTAS2559->mpCalFirmware);
-	dev_info(pTAS2559->dev, "TAS2559 calibration file size = %d\n", nSize);
-	nResult = fw_parse(pTAS2559, pTAS2559->mpCalFirmware, pBuffer, nSize);
+// 	tas2559_clear_firmware(pTAS2559->mpCalFirmware);
+// 	dev_info(pTAS2559->dev, "TAS2559 calibration file size = %d\n", nSize);
+// 	nResult = fw_parse(pTAS2559, pTAS2559->mpCalFirmware, pBuffer, nSize);
 
-	if (nResult)
-		dev_err(pTAS2559->dev, "TAS2559 calibration file is corrupt\n");
-	else
-		dev_info(pTAS2559->dev, "TAS2559 calibration: %d calibrations\n",
-			 pTAS2559->mpCalFirmware->mnCalibrations);
+// 	if (nResult)
+// 		dev_err(pTAS2559->dev, "TAS2559 calibration file is corrupt\n");
+// 	else
+// 		dev_info(pTAS2559->dev, "TAS2559 calibration: %d calibrations\n",
+// 			 pTAS2559->mpCalFirmware->mnCalibrations);
 
-end:
+// end:
 
-	return nResult;
-}
+// 	return nResult;
+// }
 
 void tas2559_fw_ready(const struct firmware *pFW, void *pContext)
 {
@@ -2829,17 +2829,17 @@ int tas2559_set_calibration(struct tas2559_priv *pTAS2559, int nCalibration)
 		goto end;
 	}
 
-	if (nCalibration == 0x00FF) {
-		dev_info(pTAS2559->dev, "load new calibration file %s\n", TAS2559_CAL_NAME);
-		nResult = tas2559_load_calibration(pTAS2559, TAS2559_CAL_NAME);
+	// if (nCalibration == 0x00FF) {
+	// 	dev_info(pTAS2559->dev, "load new calibration file %s\n", TAS2559_CAL_NAME);
+	// 	nResult = tas2559_load_calibration(pTAS2559, TAS2559_CAL_NAME);
 
-		if (nResult < 0) {
-			nResult = 0;
-			goto end;
-		}
+	// 	if (nResult < 0) {
+	// 		nResult = 0;
+	// 		goto end;
+	// 	}
 
-		nCalibration = 0;
-	}
+	// 	nCalibration = 0;
+	// }
 
 	if (nCalibration >= pTAS2559->mpCalFirmware->mnCalibrations) {
 		dev_err(pTAS2559->dev,
