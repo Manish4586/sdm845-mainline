@@ -359,8 +359,9 @@ static int geni_i2c_rx_one_msg(struct geni_i2c_dev *gi2c, struct i2c_msg *msg,
 
 	if (!of_machine_is_compatible("lenovo,yoga-c630") &&
 	    !of_machine_is_compatible("oneplus,enchilada") &&
-		!of_machine_is_compatible("oneplus,fajita"))
-		dma_buf = i2c_get_dma_safe_msg_buf(msg, 32);
+		!of_machine_is_compatible("oneplus,fajita") &&
+		!of_machine_is_compatible("xiaomi,beryllium"))
+		dma_buf = i2c_get_dma_safe_msg_buf(msg, 32); 
 
 	if (dma_buf)
 		geni_se_select_mode(se, GENI_SE_DMA);
@@ -402,7 +403,8 @@ static int geni_i2c_tx_one_msg(struct geni_i2c_dev *gi2c, struct i2c_msg *msg,
 
 	if (!of_machine_is_compatible("lenovo,yoga-c630") &&
 	    !of_machine_is_compatible("oneplus,enchilada") &&
-		!of_machine_is_compatible("oneplus,fajita"))
+		!of_machine_is_compatible("oneplus,fajita") &&
+		!of_machine_is_compatible("xiaomi,beryllium"))
 		dma_buf = i2c_get_dma_safe_msg_buf(msg, 32);
 
 	if (dma_buf)
