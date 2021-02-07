@@ -234,6 +234,12 @@
 
 &i2c5 {
 	status="okay";
+	compatible = "i2c-gpio";
+	sda-gpios = <&tlmm 85 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+	scl-gpios = <&tlmm 86 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+	i2c-gpio,delay-us = <5>;	/* 5~=100 kHz */ /* could probably run on higher speeds */
+	#address-cells = <1>;
+	#size-cells = <0>;
 
 	/*smart PA*/
 	tas2559_codec: tas2559@4c{
@@ -256,6 +262,12 @@
 
 &i2c14 {
         status="okay";
+		compatible = "i2c-gpio";
+		sda-gpios = <&tlmm 33 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+		scl-gpios = <&tlmm 34 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+		i2c-gpio,delay-us = <5>;	/* 5~=100 kHz */ /* could probably run on higher speeds */
+		#address-cells = <1>;
+		#size-cells = <0>;
 
         touchscreen: novatek@62 {
                 compatible = "novatek,nt36525"; /* Should be novatek,nt36672A instead #TODO */
