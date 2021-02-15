@@ -255,8 +255,6 @@ static int tas2559_dev_read(struct tas2559_priv *pTAS2559,
 			*pValue = Value;
 	}
 
-end:
-
 	mutex_unlock(&pTAS2559->dev_lock);
 	return nResult;
 }
@@ -286,8 +284,6 @@ static int tas2559_dev_write(struct tas2559_priv *pTAS2559,
 			nResult = tas2559_i2c_write_device(pTAS2559,
 							   pTAS2559->mnDevBAddr, TAS2559_PAGE_REG(nRegister), nValue);
 	}
-
-end:
 
 	mutex_unlock(&pTAS2559->dev_lock);
 	return nResult;
@@ -327,8 +323,6 @@ static int tas2559_dev_bulk_read(struct tas2559_priv *pTAS2559,
 			}
 	}
 
-end:
-
 	mutex_unlock(&pTAS2559->dev_lock);
 	return nResult;
 }
@@ -363,8 +357,6 @@ static int tas2559_dev_bulk_write(struct tas2559_priv *pTAS2559,
 							       pTAS2559->mnDevBAddr, reg, pData, nLength);
 	}
 
-end:
-
 	mutex_unlock(&pTAS2559->dev_lock);
 	return nResult;
 }
@@ -396,8 +388,6 @@ static int tas2559_dev_update_bits(
 			nResult = tas2559_i2c_update_bits(pTAS2559,
 							  pTAS2559->mnDevBAddr, TAS2559_PAGE_REG(nRegister), nMask, nValue);
 	}
-
-end:
 
 	mutex_unlock(&pTAS2559->dev_lock);
 	return nResult;
