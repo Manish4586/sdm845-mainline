@@ -567,6 +567,9 @@
 	status = "okay";
 	vdda-supply = <&vdda_mipi_dsi0_1p2>;
 
+	#address-cells = <1>;
+	#size-cells = <0>;
+
 	ports {
 		port@1 {
 			endpoint {
