@@ -291,6 +291,10 @@
 	qcom,battery-capacity-ua = <4000000>;
 };
 
+&pmi8998_haptics {
+	qcom,wave-play-rate-us = <4878>;
+};
+
 &pm8998_pon {
 	resin {
 		compatible = "qcom,pm8941-resin";
