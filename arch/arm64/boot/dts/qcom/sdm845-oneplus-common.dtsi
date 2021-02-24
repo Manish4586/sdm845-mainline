@@ -7,6 +7,7 @@
 
 /dts-v1/;
 
+#include <dt-bindings/dma/qcom-gpi.h>
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/linux-event-codes.h>
 #include <dt-bindings/regulator/qcom,rpmh-regulator.h>
@@ -433,6 +434,12 @@
 
 	qcom,max-voltage-uv = <4400000>;
 	qcom,min-voltage-uv = <3700000>;
+};
+
+&pmi8998_haptics {
+	status = "okay";
+	// This is the LRA resonant frequency and is device specific
+	qcom,wave-play-rate-us = <4255>; // 1/4255us = 235.017626322 Hz - for OnePlus 6
 };
 
 &qupv3_id_1 {

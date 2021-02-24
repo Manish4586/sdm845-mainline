@@ -292,6 +292,8 @@
 };
 
 &pmi8998_haptics {
+	status = "okay";
+	// This is the LRA resonant frequency and is device specific
 	qcom,wave-play-rate-us = <4878>;
 };
 
