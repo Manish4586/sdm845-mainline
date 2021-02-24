@@ -238,7 +238,7 @@
 };
 
 &i2c14 {
-	#dma-cells <5>;
+	#dma-cells = <3>;
 	status="okay";
 
 	dmas =  <&gpi_dma1 0 6 QCOM_GPI_I2C>,

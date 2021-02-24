@@ -354,12 +354,12 @@
 };
 
 &i2c12 {
-	#dma-cells <3>;
+	#dma-cells = <3>;
 	status = "okay";
 	clock-frequency = <400000>;
 
-	dmas =  <&gpi_dma1 0 4 GPI_DMA_I2C>,
-			<&gpi_dma1 1 4 GPI_DMA_I2C>;
+	dmas =  <&gpi_dma1 0 4 QCOM_GPI_I2C>,
+			<&gpi_dma1 1 4 QCOM_GPI_I2C>;
 	dma-names = "tx", "rx";
 
 	synaptics-rmi4-i2c@20 {
