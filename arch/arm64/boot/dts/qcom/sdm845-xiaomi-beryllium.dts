@@ -167,7 +167,7 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 			regulator-boot-on;
 			regulator-always-on;
-                };
+		};
 
 		vreg_l17a_1p3: ldo17 {
 			regulator-min-microvolt = <1304000>;
@@ -242,10 +242,11 @@
 };
 
 &i2c5 {
+	#dma-cells <3>;
 	status="okay";
 
 	dmas = <&gpi_dma0 0 5 QCOM_GPI_I2C>,
-	       <&gpi_dma0 1 5 QCOM_GPI_I2C>;
+		   <&gpi_dma0 1 5 QCOM_GPI_I2C>;
 	dma-names = "tx", "rx";
 
 	/*smart PA*/
@@ -272,17 +273,17 @@
 	status="okay";
 
 	dmas =  <&gpi_dma1 0 6 QCOM_GPI_I2C>,
-		    <&gpi_dma1 1 6 QCOM_GPI_I2C>;
+			<&gpi_dma1 1 6 QCOM_GPI_I2C>;
 	dma-names = "tx", "rx";
 
-        touchscreen: novatek@62 {
-                compatible = "novatek,nt36525"; /* Should be novatek,nt36672A instead #TODO */
-                reg = <0x62>;
-                vdd-supply = <&vreg_l14a_1p88>;
-                interrupt-parent = <&tlmm>;
-                interrupts = <31 IRQ_TYPE_EDGE_RISING>;
-                reset-gpio = <&tlmm 32 0x00 /* GPIO_ACTIVE_HIGH */ >;
-        };
+		touchscreen: novatek@62 {
+				compatible = "novatek,nt36525"; /* Should be novatek,nt36672A instead #TODO */
+				reg = <0x62>;
+				vdd-supply = <&vreg_l14a_1p88>;
+				interrupt-parent = <&tlmm>;
+				interrupts = <31 IRQ_TYPE_EDGE_RISING>;
+				reset-gpio = <&tlmm 32 0x00 /* GPIO_ACTIVE_HIGH */ >;
+		};
 
 };
 
@@ -572,9 +573,9 @@
 	vdd-rx-supply = <&vreg_s4a_1p8>;
 	vdd-io-supply = <&vreg_s4a_1p8>;
 	qcom,micbias1-microvolt = <2700000>;
-    qcom,micbias2-microvolt = <1800000>;
-    qcom,micbias3-microvolt = <2700000>;
-    qcom,micbias4-microvolt = <2700000>;
+	qcom,micbias2-microvolt = <1800000>;
+	qcom,micbias3-microvolt = <2700000>;
+	qcom,micbias4-microvolt = <2700000>;
 };
 
 &wifi {
