@@ -17,3 +17,58 @@
 
 	compatible = "samsung,sofef00";
 };
+
+&i2c4 {
+	status = "okay";
+	clock-frequency = <400000>;
+
+	max98927_codec: max98927@3a {
+		#sound-dai-cells = <1>;
+		compatible = "maxim,max98927";
+		reg = <0x3a>;
+	};
+};
+
+&sound {
+	model = "OnePlus 6";
+	audio-routing =	"RX_BIAS", "MCLK",
+			"AMIC2", "MIC BIAS2",
+			"AMIC3", "MIC BIAS4",
+			"AMIC4", "MIC BIAS1",
+			"AMIC5", "MIC BIAS4",
+			"DMIC0", "MIC BIAS1",
+			"DMIC1", "MIC BIAS1",
+			"DMIC2", "MIC BIAS3",
+			"DMIC3", "MIC BIAS3",
+			"DMIC4", "MIC BIAS4",
+			"DMIC5", "MIC BIAS4",
+			"MM_DL1", "MultiMedia1 Playback",
+			"MM_DL2", "MultiMedia2 Playback",
+			"MM_DL3", "MultiMedia3 Playback",
+			"MM_DL4", "MultiMedia4 Playback",
+			"MM_DL5", "MultiMedia5 Playback",
+			"MM_DL6", "MultiMedia6 Playback",
+			"MM_DL7", "MultiMedia7 Playback",
+			"MM_DL8", "MultiMedia8 Playback",
+			"MultiMedia1 Capture", "MM_UL1",
+			"MultiMedia2 Capture", "MM_UL2",
+			"MultiMedia3 Capture", "MM_UL3",
+			"MultiMedia4 Capture", "MM_UL4",
+			"MultiMedia5 Capture", "MM_UL5",
+			"MultiMedia6 Capture", "MM_UL6",
+			"MultiMedia7 Capture", "MM_UL7",
+			"MultiMedia8 Capture", "MM_UL8";
+
+	speaker-dai-link {
+		codec {
+			sound-dai = <&max98927_codec 0>;
+		};
+	};
+};
+
+&wcd9340 {
+	qcom,micbias1-microvolt = <1800000>;
+	qcom,micbias2-microvolt = <2700000>;
+	qcom,micbias3-microvolt = <1800000>;
+	qcom,micbias4-microvolt = <1800000>;
+};

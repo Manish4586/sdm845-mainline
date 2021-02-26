@@ -21,3 +21,10 @@
 &rmi4_f12 {
 	touchscreen-y-mm = <148>;
 };
+
+&wcd9340 {
+	qcom,micbias1-microvolt = <2700000>;
+	qcom,micbias2-microvolt = <2700000>;
+	qcom,micbias3-microvolt = <2700000>;
+	qcom,micbias4-microvolt = <2700000>;
+};
