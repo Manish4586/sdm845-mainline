@@ -1026,7 +1026,7 @@ static struct snd_soc_dai_driver tas2559_dai_driver[] = {
 			.formats = TAS2559_FORMATS,
 		},
 		.ops = &tas2559_dai_ops,
-		.symmetric_rates = 1,
+		.symmetric_rate = 1,
 	},
 	{
 		.name = "tas2559 ASI2",
@@ -1039,7 +1039,7 @@ static struct snd_soc_dai_driver tas2559_dai_driver[] = {
 			.formats = TAS2559_FORMATS,
 		},
 		.ops = &tas2559_dai_ops,
-		.symmetric_rates = 1,
+		.symmetric_rate = 1,
 	},
 	{
 		.name = "tas2559 ASIM",
@@ -1052,7 +1052,7 @@ static struct snd_soc_dai_driver tas2559_dai_driver[] = {
 			.formats = TAS2559_FORMATS,
 		},
 		.ops = &tas2559_dai_ops,
-		.symmetric_rates = 1,
+		.symmetric_rate = 1,
 	},
 };
 
