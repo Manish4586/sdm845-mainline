@@ -1,0 +1,15 @@
+
+variables:
+  KERNEL_DEFCONFIG: "defconfig sdm845.config"
+
+include:
+  - 'https://gitlab.com/sdm845-mainline/ci-scripts/-/raw/master/templates/preamble.yml'
+  - 'https://gitlab.com/sdm845-mainline/ci-scripts/-/raw/master/templates/kernel.yml'
+
+build_kernel:
+  artifacts:
+    paths:
+      - .output/arch/arm64/boot/Image.gz
+      - .output/arch/arm64/boot/dts/qcom/sdm845-oneplus-enchilada.dtb
+      - .output/arch/arm64/boot/dts/qcom/sdm845-oneplus-fajita.dtb
+      - .output/arch/arm64/boot/dts/qcom/sdm845-xiaomi-beryllium.dtb
