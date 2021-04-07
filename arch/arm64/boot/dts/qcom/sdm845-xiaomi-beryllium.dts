@@ -390,10 +390,7 @@
 		"RX_BIAS", "MCLK",
 		"AMIC1", "MIC BIAS1",
 		"AMIC2", "MIC BIAS2",
-		"AMIC3", "MIC BIAS3",
-		"MM_DL1",  "MultiMedia1 Playback",
-		"MM_DL2",  "MultiMedia2 Playback",
-		"MultiMedia3 Capture", "MM_UL3";
+		"AMIC3", "MIC BIAS3";
 
 	mm1-dai-link {
 		link-name = "MultiMedia1";
