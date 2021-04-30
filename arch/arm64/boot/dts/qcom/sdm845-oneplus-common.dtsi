@@ -317,7 +317,7 @@
 		reset-gpios = <&tlmm 6 GPIO_ACTIVE_LOW>;
 
 		pinctrl-names = "default";
-		pinctrl-0 = <&panel_reset_pins &panel_te_pin &panel_esd_pin>;
+		pinctrl-0 = <&panel_reset_pins &panel_esd_pin>; //&panel_te_pin 
 
 		port {
 			panel_in: endpoint {
@@ -591,15 +591,15 @@
 		};
 	};
 
-	panel_te_pin: panel-te {
-		mux {
-			pins = "gpio10";
-			function = "mdp_vsync";
-			drive-strength = <2>;
-			bias-disable;
-			input-enable;
-		};
-	};
+	// panel_te_pin: panel-te {
+	// 	mux {
+	// 		pins = "gpio10";
+	// 		function = "mdp_vsync";
+	// 		drive-strength = <2>;
+	// 		bias-disable;
+	// 		input-enable;
+	// 	};
+	// };
 
 	panel_esd_pin: panel-esd {
 		mux {
