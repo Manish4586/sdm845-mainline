@@ -7,6 +7,7 @@
 
 /dts-v1/;
 
+#include <dt-bindings/dma/qcom-gpi.h>
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/linux-event-codes.h>
 #include <dt-bindings/regulator/qcom,rpmh-regulator.h>
@@ -365,8 +366,13 @@
 };
 
 &i2c12 {
+	#dma-cells = <3>;
 	status = "okay";
 	clock-frequency = <400000>;
+
+	dmas =  <&gpi_dma1 0 4 QCOM_GPI_I2C>,
+			<&gpi_dma1 1 4 QCOM_GPI_I2C>;
+	dma-names = "tx", "rx";
 
 	synaptics-rmi4-i2c@20 {
 		compatible = "syna,rmi4-i2c";
@@ -397,6 +403,11 @@
 			syna,rezero-wait-ms = <200>;
 		};
 	};
+};
+
+&ipa {
+	status = "okay";
+	memory-region = <&ipa_fw_mem>;
 };
 
 &mdss {
@@ -433,6 +444,18 @@
 			qcom,drive-strength = <0>;
 		};
 	};
+};
+
+&pmi8998_fg {
+	status = "okay";
+
+	qcom,max-voltage-uv = <4400000>;
+	qcom,min-voltage-uv = <3700000>;
+};
+
+&pmi8998_haptics {
+	status = "okay";
+	qcom,wave-play-rate-us = <4255>;
 };
 
 &qupv3_id_1 {
@@ -599,7 +622,7 @@
 			pins = "gpio6", "gpio25", "gpio26";
 			function = "gpio";
 			drive-strength = <8>;
-			bias-disable = <0>;
+			bias-disable;
 		};
 	};
 
