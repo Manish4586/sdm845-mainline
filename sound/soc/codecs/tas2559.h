@@ -655,25 +655,6 @@ struct tas2559_priv {
 	unsigned char mnDevBCurrentBook;
 	unsigned char mnDevBCurrentPage;
 
-	int (*read)(struct tas2559_priv *pTAS2559,
-		    enum channel chn, unsigned int reg, unsigned int *pValue);
-	int (*write)(struct tas2559_priv *pTAS2559,
-		     enum channel chn, unsigned int reg, unsigned int Value);
-	int (*bulk_read)(struct tas2559_priv *pTAS2559,
-			 enum channel chn, unsigned int reg, unsigned char *pData, unsigned int len);
-	int (*bulk_write)(struct tas2559_priv *pTAS2559,
-			  enum channel chn, unsigned int reg, unsigned char *pData, unsigned int len);
-	int (*update_bits)(struct tas2559_priv *pTAS2559,
-			   enum channel chn, unsigned int reg, unsigned int mask, unsigned int value);
-	int (*set_config)(struct tas2559_priv *pTAS2559, int config);
-	int (*set_calibration)(struct tas2559_priv *pTAS2559, int calibration);
-	void (*clearIRQ)(struct tas2559_priv *pTAS2559);
-	void (*enableIRQ)(struct tas2559_priv *pTAS2559, enum channel chl, bool enable);
-	void (*hw_reset)(struct tas2559_priv *pTAS2559);
-	/* device is working, but system is suspended */
-	int (*runtime_suspend)(struct tas2559_priv *pTAS2559);
-	int (*runtime_resume)(struct tas2559_priv *pTAS2559);
-
 	unsigned int mnVBoostState;
 	bool mbLoadVBoostPrePowerUp;
 	unsigned int mnVBoostVoltage;
@@ -700,21 +681,6 @@ struct tas2559_priv {
 	struct mutex codec_lock;
 };
 
-int tas2559_DevMuteStatus(struct tas2559_priv *pTAS2559, enum channel dev, bool *pMute);
-int tas2559_DevMute(struct tas2559_priv *pTAS2559, enum channel dev, bool mute);
-int tas2559_SA_ctl_echoRef(struct tas2559_priv *pTAS2559);
-int tas2559_set_VBstVolt(struct tas2559_priv *pTAS2559, unsigned int vbstvolt);
-int tas2559_set_VBoost(struct tas2559_priv *pTAS2559, int vboost, bool bPowerUp);
-int tas2559_get_VBoost(struct tas2559_priv *pTAS2559, int *pVBoost);
-int tas2559_SA_DevChnSetup(struct tas2559_priv *pTAS2559, unsigned int mode);
-int tas2559_get_Cali_prm_r0(struct tas2559_priv *pTAS2559, enum channel chl, int *prm_r0);
-int tas2559_get_die_temperature(struct tas2559_priv *pTAS2559, int *pTemperature);
-int tas2559_enable(struct tas2559_priv *pTAS2559, bool bEnable);
-int tas2559_set_sampling_rate(struct tas2559_priv *pTAS2559,
-			      unsigned int nSamplingRate);
-int tas2559_set_bit_rate(struct tas2559_priv *pTAS2559, unsigned int nBitRate);
-int tas2559_get_bit_rate(struct tas2559_priv *pTAS2559, unsigned char *pBitRate);
-int tas2559_set_config(struct tas2559_priv *pTAS2559, int config);
 void tas2559_fw_ready(const struct firmware *pFW, void *pContext);
 int tas2559_set_program(struct tas2559_priv *pTAS2559,
 			unsigned int nProgram, int nConfig);
@@ -727,9 +693,6 @@ int tas2559_get_DAC_gain(struct tas2559_priv *pTAS2559,
 int tas2559_set_DAC_gain(struct tas2559_priv *pTAS2559,
 			 enum channel chl, unsigned int nGain);
 int tas2559_configIRQ(struct tas2559_priv *pTAS2559, enum channel dev);
-
-// static int tas2559_load_calibration(struct tas2559_priv *pTAS2559,
-// 				    char *pFileName);
 static int tas2559_load_data(struct tas2559_priv *pTAS2559, struct TData *pData,
 			     unsigned int nType);
 static void tas2559_clear_firmware(struct TFirmware *pFirmware);
