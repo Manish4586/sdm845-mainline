@@ -46,6 +46,164 @@
 
 #include "tas2559.h"
 
+struct TBlock {
+	unsigned int mnType;
+	unsigned char mbPChkSumPresent;
+	unsigned char mnPChkSum;
+	unsigned char mbYChkSumPresent;
+	unsigned char mnYChkSum;
+	unsigned int mnCommands;
+	unsigned char *mpData;
+};
+
+struct TData {
+	char mpName[64];
+	char *mpDescription;
+	unsigned int mnBlocks;
+	struct TBlock *mpBlocks;
+};
+
+struct TProgram {
+	char mpName[64];
+	char *mpDescription;
+	unsigned char mnAppMode;
+	unsigned short mnBoost;
+	struct TData mData;
+};
+
+struct TPLL {
+	char mpName[64];
+	char *mpDescription;
+	struct TBlock mBlock;
+};
+
+struct TConfiguration {
+	char mpName[64];
+	char *mpDescription;
+	unsigned int mnDevices;
+	unsigned int mnProgram;
+	unsigned int mnPLL;
+	unsigned int mnSamplingRate;
+	unsigned char mnPLLSrc;
+	unsigned int mnPLLSrcRate;
+	struct TData mData;
+};
+
+struct TCalibration {
+	char mpName[64];
+	char *mpDescription;
+	unsigned int mnProgram;
+	unsigned int mnConfiguration;
+	struct TData mData;
+};
+
+struct TFirmware {
+	unsigned int mnFWSize;
+	unsigned int mnChecksum;
+	unsigned int mnPPCVersion;
+	unsigned int mnFWVersion;
+	unsigned int mnDriverVersion;
+	unsigned int mnTimeStamp;
+	char mpDDCName[64];
+	char *mpDescription;
+	unsigned int mnDeviceFamily;
+	unsigned int mnDevice;
+	unsigned int mnPLLs;
+	struct TPLL *mpPLLs;
+	unsigned int mnPrograms;
+	struct TProgram *mpPrograms;
+	unsigned int mnConfigurations;
+	struct TConfiguration *mpConfigurations;
+	unsigned int mnCalibrations;
+	struct TCalibration *mpCalibrations;
+};
+
+struct TYCRC {
+	unsigned char mnOffset;
+	unsigned char mnLen;
+};
+
+struct tas2559_register {
+	int book;
+	int page;
+	int reg;
+};
+
+enum channel {
+	DevA = 0x01,
+	DevB = 0x02,
+	DevBoth = (DevA | DevB),
+};
+
+struct tas2559_priv {
+	struct device *dev;
+	struct regmap *mpRegmap;
+	struct i2c_client *client;
+	struct mutex dev_lock;
+	struct TFirmware *mpFirmware;
+	struct TFirmware *mpCalFirmware;
+	unsigned int mnCurrentProgram;
+	unsigned int mnCurrentSampleRate;
+	unsigned int mnCurrentConfiguration;
+	unsigned int mnNewConfiguration;
+	unsigned int mnCurrentCalibration;
+	enum channel mnCurrentChannel;
+	unsigned int mnBitRate;
+	bool mbPowerUp;
+	bool mbLoadConfigurationPrePowerUp;
+	struct delayed_work irq_work;
+	unsigned int mnEchoRef;
+	bool mbYCRCEnable;
+	bool mbIRQEnable;
+	bool mbCalibrationLoaded;
+
+	/* parameters for TAS2559 */
+	int mnDevAPGID;
+	int mnDevAGPIORST;
+	int mnDevAGPIOIRQ;
+	int mnDevAIRQ;
+	unsigned char mnDevAAddr;
+	unsigned char mnDevAChl;
+	unsigned char mnDevACurrentBook;
+	unsigned char mnDevACurrentPage;
+
+	/* parameters for TAS2560 */
+	int mnDevBPGID;
+	int mnDevBGPIORST;
+	int mnDevBGPIOIRQ;
+	int mnDevBIRQ;
+	unsigned char mnDevBAddr;
+	unsigned char mnDevBChl;
+	unsigned char mnDevBLoad;
+	unsigned char mnDevBCurrentBook;
+	unsigned char mnDevBCurrentPage;
+
+	unsigned int mnVBoostState;
+	bool mbLoadVBoostPrePowerUp;
+	unsigned int mnVBoostVoltage;
+	unsigned int mnVBoostNewState;
+	unsigned int mnVBoostDefaultCfg[6];
+
+	/* for low temperature check */
+	unsigned int mnDevGain;
+	unsigned int mnDevCurrentGain;
+	unsigned int mnDieTvReadCounter;
+	struct hrtimer mtimer;
+	struct work_struct mtimerwork;
+
+	unsigned int mnChannelState;
+	unsigned char mnDefaultChlData[16];
+
+	/* device is working, but system is suspended */
+	bool mbRuntimeSuspend;
+
+	unsigned int mnErrCode;
+
+	unsigned int mnRestart;
+	bool mbMute;
+	struct mutex codec_lock;
+};
+
 static unsigned int p_tas2559_default_data[] = {
 	DevA, TAS2559_SAR_ADC2_REG, 0x05,/* enable SAR ADC */
 	DevA, TAS2559_CLK_ERR_CTRL2, 0x21,/*clk1:clock hysteresis, 0.34ms; clock halt, 22ms*/
@@ -1357,815 +1515,70 @@ end:
 	return nResult;
 }
 
-static void failsafe(struct tas2559_priv *pTAS2559)
+
+void tas2559_clear_firmware(struct TFirmware *pFirmware)
 {
-	dev_err(pTAS2559->dev, "%s\n", __func__);
-	pTAS2559->mnErrCode |= ERROR_FAILSAFE;
+	unsigned int n, nn;
 
-	if (hrtimer_active(&pTAS2559->mtimer))
-		hrtimer_cancel(&pTAS2559->mtimer);
-
-	if(pTAS2559->mnRestart < RESTART_MAX)
-	{
-		pTAS2559->mnRestart ++;
-		msleep(100);
-		dev_err(pTAS2559->dev, "I2C COMM error, restart SmartAmp.\n");
-		schedule_delayed_work(&pTAS2559->irq_work, msecs_to_jiffies(100));
+	if (!pFirmware)
 		return;
-	}
 
-	tas2559_enableIRQ(pTAS2559, DevBoth, false);
-	tas2559_DevShutdown(pTAS2559, DevBoth);
-	pTAS2559->mbPowerUp = false;
-	tas2559_hw_reset(pTAS2559);
-	tas2559_dev_write(pTAS2559, DevBoth, TAS2559_SW_RESET_REG, 0x01);
-	msleep(1);
-	tas2559_dev_write(pTAS2559, DevA, TAS2559_SPK_CTRL_REG, 0x04);
-	tas2559_dev_write(pTAS2559, DevB, TAS2560_SPK_CTRL_REG, 0x50);
+	kfree(pFirmware->mpDescription);
 
-	if (pTAS2559->mpFirmware != NULL)
-		tas2559_clear_firmware(pTAS2559->mpFirmware);
-}
-
-int tas2559_checkPLL(struct tas2559_priv *pTAS2559)
-{
-	int nResult = 0;
-	/*
-	* TO DO
-	*/
-
-	return nResult;
-}
-
-/*
-* tas2559_load_coefficient
-*/
-static int tas2559_load_coefficient(struct tas2559_priv *pTAS2559,
-				    int nPrevConfig, int nNewConfig, bool bPowerOn)
-{
-	int nResult = 0;
-	struct TPLL *pPLL;
-	struct TProgram *pProgram = NULL;
-	struct TConfiguration *pPrevConfiguration;
-	struct TConfiguration *pNewConfiguration;
-	enum channel chl;
-	bool bRestorePower = false;
-
-	dev_dbg(pTAS2559->dev, "%s, Prev=%d, new=%d, Pow=%d\n",
-		__func__, nPrevConfig, nNewConfig, bPowerOn);
-
-	if (!pTAS2559->mpFirmware->mnConfigurations) {
-		dev_err(pTAS2559->dev, "%s, firmware not loaded\n", __func__);
-		goto end;
-	}
-
-	if (nNewConfig >= pTAS2559->mpFirmware->mnConfigurations) {
-		dev_err(pTAS2559->dev, "%s, invalid configuration New=%d, total=%d\n",
-			__func__, nNewConfig, pTAS2559->mpFirmware->mnConfigurations);
-		goto end;
-	}
-
-	if (nPrevConfig < 0) {
-		pPrevConfiguration = NULL;
-		chl = DevBoth;
-	} else
-		if (nPrevConfig == nNewConfig) {
-			dev_dbg(pTAS2559->dev, "%d configuration is already loaded\n", nNewConfig);
-			goto end;
-		} else {
-			pPrevConfiguration = &(pTAS2559->mpFirmware->mpConfigurations[nPrevConfig]);
-			chl = pPrevConfiguration->mnDevices;
+	if (pFirmware->mpPLLs != NULL) {
+		for (n = 0; n < pFirmware->mnPLLs; n++) {
+			kfree(pFirmware->mpPLLs[n].mpDescription);
+			kfree(pFirmware->mpPLLs[n].mBlock.mpData);
 		}
 
-	pNewConfiguration = &(pTAS2559->mpFirmware->mpConfigurations[nNewConfig]);
-	pTAS2559->mnCurrentConfiguration = nNewConfig;
-
-	if (pPrevConfiguration) {
-		if ((pPrevConfiguration->mnPLL == pNewConfiguration->mnPLL)
-		    && (pPrevConfiguration->mnDevices == pNewConfiguration->mnDevices)) {
-			dev_dbg(pTAS2559->dev, "%s, PLL and device same\n", __func__);
-			goto prog_coefficient;
-		}
+		kfree(pFirmware->mpPLLs);
 	}
 
-	pProgram = &(pTAS2559->mpFirmware->mpPrograms[pTAS2559->mnCurrentProgram]);
+	if (pFirmware->mpPrograms != NULL) {
+		for (n = 0; n < pFirmware->mnPrograms; n++) {
+			kfree(pFirmware->mpPrograms[n].mpDescription);
+			kfree(pFirmware->mpPrograms[n].mData.mpDescription);
 
-	if (bPowerOn) {
-		if (hrtimer_active(&pTAS2559->mtimer))
-			hrtimer_cancel(&pTAS2559->mtimer);
+			for (nn = 0; nn < pFirmware->mpPrograms[n].mData.mnBlocks; nn++)
+				kfree(pFirmware->mpPrograms[n].mData.mpBlocks[nn].mpData);
 
-		if (pProgram->mnAppMode == TAS2559_APP_TUNINGMODE)
-			tas2559_enableIRQ(pTAS2559, DevBoth, false);
-
-		nResult = tas2559_DevShutdown(pTAS2559, chl);
-
-		if (nResult < 0)
-			goto end;
-
-		bRestorePower = true;
-	}
-
-	/* load PLL */
-	pPLL = &(pTAS2559->mpFirmware->mpPLLs[pNewConfiguration->mnPLL]);
-	dev_dbg(pTAS2559->dev, "load PLL: %s block for Configuration %s\n",
-		pPLL->mpName, pNewConfiguration->mpName);
-	nResult = tas2559_load_block(pTAS2559, &(pPLL->mBlock));
-
-	if (nResult < 0)
-		goto end;
-
-	pTAS2559->mnCurrentSampleRate = pNewConfiguration->mnSamplingRate;
-
-	dev_dbg(pTAS2559->dev, "load configuration %s conefficient pre block\n",
-		pNewConfiguration->mpName);
-
-	if (pNewConfiguration->mnDevices & DevA) {
-		nResult = tas2559_load_data(pTAS2559, &(pNewConfiguration->mData), TAS2559_BLOCK_CFG_PRE_DEV_A);
-
-		if (nResult < 0)
-			goto end;
-	}
-
-	if (pNewConfiguration->mnDevices & DevB) {
-		nResult = tas2559_load_data(pTAS2559, &(pNewConfiguration->mData), TAS2559_BLOCK_CFG_PRE_DEV_B);
-
-		if (nResult < 0)
-			goto end;
-	}
-
-prog_coefficient:
-	dev_dbg(pTAS2559->dev, "load new configuration: %s, coeff block data\n",
-		pNewConfiguration->mpName);
-
-	if (pNewConfiguration->mnDevices & DevA) {
-		nResult = tas2559_load_data(pTAS2559, &(pNewConfiguration->mData),
-					    TAS2559_BLOCK_CFG_COEFF_DEV_A);
-		if (nResult < 0)
-			goto end;
-	}
-
-	if (pNewConfiguration->mnDevices & DevB) {
-		nResult = tas2559_load_data(pTAS2559, &(pNewConfiguration->mData),
-					    TAS2559_BLOCK_CFG_COEFF_DEV_B);
-		if (nResult < 0)
-			goto end;
-	}
-
-	if (pTAS2559->mnChannelState == TAS2559_AD_BD) {
-		nResult = tas2559_dev_bulk_read(pTAS2559,
-				DevA, TAS2559_SA_CHL_CTRL_REG, pTAS2559->mnDefaultChlData, 16);
-		if (nResult < 0)
-			goto end;
-	} else {
-		nResult = tas2559_SA_DevChnSetup(pTAS2559, pTAS2559->mnChannelState);
-		if (nResult < 0)
-			goto end;
-	}
-
-	if (pTAS2559->mpCalFirmware->mnCalibrations) {
-		nResult = tas2559_set_calibration(pTAS2559, pTAS2559->mnCurrentCalibration);
-		if (nResult < 0)
-			goto end;
-	}
-
-	if (bRestorePower) {
-		dev_dbg(pTAS2559->dev, "%s, set vboost, before power on %d\n",
-			__func__, pTAS2559->mnVBoostState);
-		nResult = tas2559_set_VBoost(pTAS2559, pTAS2559->mnVBoostState, false);
-		if (nResult < 0)
-			goto end;
-
-		tas2559_clearIRQ(pTAS2559);
-		nResult = tas2559_DevStartup(pTAS2559, pNewConfiguration->mnDevices);
-		if (nResult < 0)
-			goto end;
-
-		if (pProgram->mnAppMode == TAS2559_APP_TUNINGMODE) {
-			nResult = tas2559_checkPLL(pTAS2559);
-
-			if (nResult < 0) {
-				nResult = tas2559_DevShutdown(pTAS2559, pNewConfiguration->mnDevices);
-				pTAS2559->mbPowerUp = false;
-				goto end;
-			}
+			kfree(pFirmware->mpPrograms[n].mData.mpBlocks);
 		}
 
-		if (pNewConfiguration->mnDevices & DevB) {
-			nResult = tas2559_load_data(pTAS2559, &(pNewConfiguration->mData),
-						    TAS2559_BLOCK_PST_POWERUP_DEV_B);
+		kfree(pFirmware->mpPrograms);
+	}
 
-			if (nResult < 0)
-				goto end;
+	if (pFirmware->mpConfigurations != NULL) {
+		for (n = 0; n < pFirmware->mnConfigurations; n++) {
+			kfree(pFirmware->mpConfigurations[n].mpDescription);
+			kfree(pFirmware->mpConfigurations[n].mData.mpDescription);
+
+			for (nn = 0; nn < pFirmware->mpConfigurations[n].mData.mnBlocks; nn++)
+				kfree(pFirmware->mpConfigurations[n].mData.mpBlocks[nn].mpData);
+
+			kfree(pFirmware->mpConfigurations[n].mData.mpBlocks);
 		}
 
-		dev_dbg(pTAS2559->dev,
-			"device powered up, load unmute\n");
-		nResult = tas2559_DevMute(pTAS2559, pNewConfiguration->mnDevices, false);
-
-		if (nResult < 0)
-			goto end;
-
-		if (pProgram->mnAppMode == TAS2559_APP_TUNINGMODE) {
-			tas2559_enableIRQ(pTAS2559, pNewConfiguration->mnDevices, true);
-
-			if (!hrtimer_active(&pTAS2559->mtimer)) {
-				pTAS2559->mnDieTvReadCounter = 0;
-				hrtimer_start(&pTAS2559->mtimer,
-					      ns_to_ktime((u64)LOW_TEMPERATURE_CHECK_PERIOD * NSEC_PER_MSEC), HRTIMER_MODE_REL);
-			}
-		}
+		kfree(pFirmware->mpConfigurations);
 	}
 
-end:
-
-	if (nResult < 0)
-		dev_err(pTAS2559->dev, "%s, load new conf %s error\n", __func__, pNewConfiguration->mpName);
-
-	pTAS2559->mnNewConfiguration = pTAS2559->mnCurrentConfiguration;
-	return nResult;
-}
-
-int tas2559_enable(struct tas2559_priv *pTAS2559, bool bEnable)
-{
-	int nResult = 0;
-	struct TProgram *pProgram;
-	struct TConfiguration *pConfiguration;
-	unsigned int nValue;
-
-	dev_dbg(pTAS2559->dev, "%s: %s\n", __func__, bEnable ? "On" : "Off");
-
-	if ((pTAS2559->mpFirmware->mnPrograms == 0)
-	    || (pTAS2559->mpFirmware->mnConfigurations == 0)) {
-		dev_err(pTAS2559->dev, "%s, firmware not loaded\n", __func__);
-		/*Load firmware*/
-		nResult = request_firmware_nowait(THIS_MODULE, 1, TAS2559_FW_NAME,
-			pTAS2559->dev, GFP_KERNEL, pTAS2559, tas2559_fw_ready);
-		if(nResult < 0) {
-			dev_err(pTAS2559->dev, "%s, firmware is loaded\n", __func__);
-			goto end;
-		}
-	}
-
-	/* check safe guard*/
-	nResult = tas2559_dev_read(pTAS2559, DevA, TAS2559_SAFE_GUARD_REG, &nValue);
-	if (nResult < 0)
-		goto end;
-	if ((nValue & 0xff) != TAS2559_SAFE_GUARD_PATTERN) {
-		dev_err(pTAS2559->dev, "ERROR DevA safe guard (0x%x) failure!\n", nValue);
-		nResult = -EPIPE;
-		pTAS2559->mnErrCode = ERROR_SAFE_GUARD;
-		pTAS2559->mbPowerUp = true;
-		goto end;
-	}
-
-	pProgram = &(pTAS2559->mpFirmware->mpPrograms[pTAS2559->mnCurrentProgram]);
-	if (bEnable) {
-		if (!pTAS2559->mbPowerUp) {
-			if (!pTAS2559->mbCalibrationLoaded) {
-				tas2559_set_calibration(pTAS2559, 0xFF);
-				pTAS2559->mbCalibrationLoaded = true;
-			}
-
-			tas2559_dev_read(pTAS2559, DevA, TAS2559_VBOOST_CTL_REG, &nValue);
-			dev_dbg(pTAS2559->dev, "VBoost ctrl register before coeff set: 0x%x\n", nValue);
-
-			if (pTAS2559->mbLoadConfigurationPrePowerUp) {
-				pTAS2559->mbLoadConfigurationPrePowerUp = false;
-				nResult = tas2559_load_coefficient(pTAS2559,
-								pTAS2559->mnCurrentConfiguration, pTAS2559->mnNewConfiguration, false);
-				if (pTAS2559->mnCurrentConfiguration != pTAS2559->mnNewConfiguration) {
-					pTAS2559->mbLoadVBoostPrePowerUp = true;
-				}
-				if (nResult < 0)
-					goto end;
-			}
-
-			tas2559_dev_read(pTAS2559, DevA, TAS2559_VBOOST_CTL_REG, &nValue);
-			dev_dbg(pTAS2559->dev, "VBoost ctrl register after coeff set: 0x%x\n", nValue);
-
-			if (pTAS2559->mbLoadVBoostPrePowerUp) {
-				dev_dbg(pTAS2559->dev, "%s, cfg boost before power on new %d, current=%d\n",
-					__func__, pTAS2559->mnVBoostNewState, pTAS2559->mnVBoostState);
-				nResult = tas2559_set_VBoost(pTAS2559, pTAS2559->mnVBoostNewState, false);
-				if (nResult < 0)
-					goto end;
-				pTAS2559->mbLoadVBoostPrePowerUp = false;
-			}
-
-			tas2559_dev_read(pTAS2559, DevA, TAS2559_VBOOST_CTL_REG, &nValue);
-			dev_dbg(pTAS2559->dev, "VBoost ctrl register after set VBoost: 0x%x\n", nValue);
-
-			tas2559_clearIRQ(pTAS2559);
-			pConfiguration = &(pTAS2559->mpFirmware->mpConfigurations[pTAS2559->mnCurrentConfiguration]);
-			nResult = tas2559_DevStartup(pTAS2559, pConfiguration->mnDevices);
-			if (nResult < 0)
-				goto end;
-
-			if (pProgram->mnAppMode == TAS2559_APP_TUNINGMODE) {
-				nResult = tas2559_checkPLL(pTAS2559);
-				if (nResult < 0) {
-					nResult = tas2559_DevShutdown(pTAS2559, pConfiguration->mnDevices);
-					goto end;
-				}
-			}
-
-			if (pConfiguration->mnDevices & DevB) {
-				nResult = tas2559_load_data(pTAS2559, &(pConfiguration->mData),
-								TAS2559_BLOCK_PST_POWERUP_DEV_B);
-				if (nResult < 0)
-					goto end;
-			}
-
-			nResult = tas2559_DevMute(pTAS2559, pConfiguration->mnDevices, false);
-			if (nResult < 0)
-				goto end;
-
-			pTAS2559->mbPowerUp = true;
-
-			tas2559_get_die_temperature(pTAS2559, &nValue);
-			if(nValue == 0x80000000)
-			{
-				dev_err(pTAS2559->dev, "%s, thermal sensor is wrong, mute output\n", __func__);
-				nResult = tas2559_DevShutdown(pTAS2559, pConfiguration->mnDevices);
-				pTAS2559->mbPowerUp = false;
-				goto end;
-			}
-
-			if (pProgram->mnAppMode == TAS2559_APP_TUNINGMODE) {
-				/* turn on IRQ */
-				tas2559_enableIRQ(pTAS2559, pConfiguration->mnDevices, true);
-				if (!hrtimer_active(&pTAS2559->mtimer)) {
-					pTAS2559->mnDieTvReadCounter = 0;
-					hrtimer_start(&pTAS2559->mtimer,
-						ns_to_ktime((u64)LOW_TEMPERATURE_CHECK_PERIOD * NSEC_PER_MSEC), HRTIMER_MODE_REL);
-				}
-			}
-
-			pTAS2559->mnRestart = 0;
-		}
-	} else {
-		if (pTAS2559->mbPowerUp) {
-			if (hrtimer_active(&pTAS2559->mtimer))
-				hrtimer_cancel(&pTAS2559->mtimer);
-
-			pConfiguration = &(pTAS2559->mpFirmware->mpConfigurations[pTAS2559->mnCurrentConfiguration]);
-
-			if (pProgram->mnAppMode == TAS2559_APP_TUNINGMODE) {
-				/* turn off IRQ */
-				tas2559_enableIRQ(pTAS2559, DevBoth, false);
-			}
-
-			nResult = tas2559_DevShutdown(pTAS2559, pConfiguration->mnDevices);
-			if (nResult < 0)
-				goto end;
-
-			pTAS2559->mbPowerUp = false;
-			pTAS2559->mnRestart = 0;
-		}
-	}
-
-	nResult = 0;
-
-end:
-
-	if (nResult < 0) {
-		if (pTAS2559->mnErrCode & (ERROR_DEVA_I2C_COMM | ERROR_DEVB_I2C_COMM | ERROR_PRAM_CRCCHK | ERROR_YRAM_CRCCHK | ERROR_SAFE_GUARD))
-			failsafe(pTAS2559);
-	}
-
-	dev_dbg(pTAS2559->dev, "%s: exit\n", __func__);
-	return nResult;
-}
-
-int tas2559_set_sampling_rate(struct tas2559_priv *pTAS2559, unsigned int nSamplingRate)
-{
-	int nResult = 0;
-	struct TConfiguration *pConfiguration;
-	unsigned int nConfiguration;
-
-	dev_dbg(pTAS2559->dev, "%s: nSamplingRate = %d [Hz]\n", __func__,
-		nSamplingRate);
-
-	if ((!pTAS2559->mpFirmware->mpPrograms) ||
-	    (!pTAS2559->mpFirmware->mpConfigurations)) {
-		dev_err(pTAS2559->dev, "Firmware not loaded\n");
-		nResult = -EINVAL;
-		goto end;
-	}
-
-	pConfiguration = &(pTAS2559->mpFirmware->mpConfigurations[pTAS2559->mnCurrentConfiguration]);
-
-	if (pConfiguration->mnSamplingRate == nSamplingRate) {
-		dev_info(pTAS2559->dev, "Sampling rate for current configuration matches: %d\n",
-			 nSamplingRate);
-		nResult = 0;
-		goto end;
-	}
-
-	for (nConfiguration = 0;
-	     nConfiguration < pTAS2559->mpFirmware->mnConfigurations;
-	     nConfiguration++) {
-		pConfiguration =
-			&(pTAS2559->mpFirmware->mpConfigurations[nConfiguration]);
-
-		if ((pConfiguration->mnSamplingRate == nSamplingRate)
-		    && (pConfiguration->mnProgram == pTAS2559->mnCurrentProgram)) {
-			dev_info(pTAS2559->dev,
-				 "Found configuration: %s, with compatible sampling rate %d\n",
-				 pConfiguration->mpName, nSamplingRate);
-			nResult = tas2559_load_configuration(pTAS2559, nConfiguration, false);
-			goto end;
-		}
-	}
-
-	dev_err(pTAS2559->dev, "Cannot find a configuration that supports sampling rate: %d\n",
-		nSamplingRate);
-
-end:
-
-	return nResult;
-}
-
-static void fw_print_header(struct tas2559_priv *pTAS2559, struct TFirmware *pFirmware)
-{
-	dev_info(pTAS2559->dev, "FW Size       = %d", pFirmware->mnFWSize);
-	dev_info(pTAS2559->dev, "Checksum      = 0x%04X", pFirmware->mnChecksum);
-	dev_info(pTAS2559->dev, "PPC Version   = 0x%04X", pFirmware->mnPPCVersion);
-	dev_info(pTAS2559->dev, "FW  Version    = 0x%04X", pFirmware->mnFWVersion);
-	dev_info(pTAS2559->dev, "Driver Version= 0x%04X", pFirmware->mnDriverVersion);
-	dev_info(pTAS2559->dev, "Timestamp     = %d", pFirmware->mnTimeStamp);
-	dev_info(pTAS2559->dev, "DDC Name      = %s", pFirmware->mpDDCName);
-	dev_info(pTAS2559->dev, "Description   = %s", pFirmware->mpDescription);
-}
-
-static inline unsigned int fw_convert_number(unsigned char *pData)
-{
-	return pData[3] + (pData[2] << 8) + (pData[1] << 16) + (pData[0] << 24);
-}
-
-static int fw_parse_header(struct tas2559_priv *pTAS2559,
-			   struct TFirmware *pFirmware, unsigned char *pData, unsigned int nSize)
-{
-	unsigned char *pDataStart = pData;
-	unsigned int n;
-	unsigned char pMagicNumber[] = { 0x35, 0x35, 0x35, 0x32 };
-
-	if (nSize < 104) {
-		dev_err(pTAS2559->dev, "Firmware: Header too short");
-		return -EINVAL;
-	}
-
-	if (memcmp(pData, pMagicNumber, 4)) {
-		dev_err(pTAS2559->dev, "Firmware: Magic number doesn't match");
-		return -EINVAL;
-	}
-
-	pData += 4;
-
-	pFirmware->mnFWSize = fw_convert_number(pData);
-	pData += 4;
-
-	pFirmware->mnChecksum = fw_convert_number(pData);
-	pData += 4;
-
-	pFirmware->mnPPCVersion = fw_convert_number(pData);
-	pData += 4;
-
-	pFirmware->mnFWVersion = fw_convert_number(pData);
-	pData += 4;
-
-	pFirmware->mnDriverVersion = fw_convert_number(pData);
-	dev_err(pTAS2559->dev, "Firmware driver: 0x%x", pFirmware->mnDriverVersion);
-	pData += 4;
-
-	pFirmware->mnTimeStamp = fw_convert_number(pData);
-	pData += 4;
-
-	memcpy(pFirmware->mpDDCName, pData, 64);
-	pData += 64;
-
-	n = strlen(pData);
-	pFirmware->mpDescription = kmemdup(pData, n + 1, GFP_KERNEL);
-	pData += n + 1;
-
-	if ((pData - pDataStart) >= nSize) {
-		dev_err(pTAS2559->dev, "Firmware: Header too short after DDC description");
-		return -EINVAL;
-	}
-
-	pFirmware->mnDeviceFamily = fw_convert_number(pData);
-	pData += 4;
-
-	if (pFirmware->mnDeviceFamily != 0) {
-		dev_err(pTAS2559->dev,
-			"deviceFamily %d, not TAS device", pFirmware->mnDeviceFamily);
-		return -EINVAL;
-	}
-
-	pFirmware->mnDevice = fw_convert_number(pData);
-	pData += 4;
-
-	if (pFirmware->mnDevice != 4) {
-		dev_err(pTAS2559->dev,
-			"device %d, not TAS2559", pFirmware->mnDevice);
-		return -EINVAL;
-	}
-
-	fw_print_header(pTAS2559, pFirmware);
-
-	return pData - pDataStart;
-}
-
-static int fw_parse_block_data(struct tas2559_priv *pTAS2559, struct TFirmware *pFirmware,
-			       struct TBlock *pBlock, unsigned char *pData)
-{
-	unsigned char *pDataStart = pData;
-	unsigned int n;
-
-	pBlock->mnType = fw_convert_number(pData);
-	pData += 4;
-
-	if (pFirmware->mnDriverVersion >= PPC_DRIVER_CRCCHK) {
-		pBlock->mbPChkSumPresent = pData[0];
-		pData++;
-
-		pBlock->mnPChkSum = pData[0];
-		pData++;
-
-		pBlock->mbYChkSumPresent = pData[0];
-		pData++;
-
-		pBlock->mnYChkSum = pData[0];
-		pData++;
-	} else {
-		pBlock->mbPChkSumPresent = 0;
-		pBlock->mbYChkSumPresent = 0;
-	}
-
-	pBlock->mnCommands = fw_convert_number(pData);
-	pData += 4;
-
-	n = pBlock->mnCommands * 4;
-	pBlock->mpData = kmemdup(pData, n, GFP_KERNEL);
-	pData += n;
-
-	return pData - pDataStart;
-}
-
-static int fw_parse_data(struct tas2559_priv *pTAS2559, struct TFirmware *pFirmware,
-			 struct TData *pImageData, unsigned char *pData)
-{
-	unsigned char *pDataStart = pData;
-	unsigned int nBlock;
-	unsigned int n;
-
-	memcpy(pImageData->mpName, pData, 64);
-	pData += 64;
-
-	n = strlen(pData);
-	pImageData->mpDescription = kmemdup(pData, n + 1, GFP_KERNEL);
-	pData += n + 1;
-
-	pImageData->mnBlocks = (pData[0] << 8) + pData[1];
-	pData += 2;
-
-	pImageData->mpBlocks =
-		kmalloc(sizeof(struct TBlock) * pImageData->mnBlocks, GFP_KERNEL);
-
-	for (nBlock = 0; nBlock < pImageData->mnBlocks; nBlock++) {
-		n = fw_parse_block_data(pTAS2559, pFirmware,
-					&(pImageData->mpBlocks[nBlock]), pData);
-		pData += n;
-	}
-
-	return pData - pDataStart;
-}
-
-static int fw_parse_pll_data(struct tas2559_priv *pTAS2559,
-			     struct TFirmware *pFirmware, unsigned char *pData)
-{
-	unsigned char *pDataStart = pData;
-	unsigned int n;
-	unsigned int nPLL;
-	struct TPLL *pPLL;
-
-	pFirmware->mnPLLs = (pData[0] << 8) + pData[1];
-	pData += 2;
-
-	if (pFirmware->mnPLLs == 0)
-		goto end;
-
-	pFirmware->mpPLLs = kmalloc_array(pFirmware->mnPLLs, sizeof(struct TPLL), GFP_KERNEL);
-
-	for (nPLL = 0; nPLL < pFirmware->mnPLLs; nPLL++) {
-		pPLL = &(pFirmware->mpPLLs[nPLL]);
-
-		memcpy(pPLL->mpName, pData, 64);
-		pData += 64;
-
-		n = strlen(pData);
-		pPLL->mpDescription = kmemdup(pData, n + 1, GFP_KERNEL);
-		pData += n + 1;
-
-		n = fw_parse_block_data(pTAS2559, pFirmware, &(pPLL->mBlock), pData);
-		pData += n;
-	}
-
-end:
-	return pData - pDataStart;
-}
-
-static int fw_parse_program_data(struct tas2559_priv *pTAS2559,
-				 struct TFirmware *pFirmware, unsigned char *pData)
-{
-	unsigned char *pDataStart = pData;
-	unsigned int n;
-	unsigned int nProgram;
-	struct TProgram *pProgram;
-
-	pFirmware->mnPrograms = (pData[0] << 8) + pData[1];
-	pData += 2;
-
-	if (pFirmware->mnPrograms == 0)
-		goto end;
-
-	pFirmware->mpPrograms =
-		kmalloc(sizeof(struct TProgram) * pFirmware->mnPrograms, GFP_KERNEL);
-
-	for (nProgram = 0; nProgram < pFirmware->mnPrograms; nProgram++) {
-		pProgram = &(pFirmware->mpPrograms[nProgram]);
-		memcpy(pProgram->mpName, pData, 64);
-		pData += 64;
-
-		n = strlen(pData);
-		pProgram->mpDescription = kmemdup(pData, n + 1, GFP_KERNEL);
-		pData += n + 1;
-
-		pProgram->mnAppMode = pData[0];
-		pData++;
-
-		pProgram->mnBoost = (pData[0] << 8) + pData[1];
-		pData += 2;
-
-		n = fw_parse_data(pTAS2559, pFirmware, &(pProgram->mData), pData);
-		pData += n;
-	}
-
-end:
-
-	return pData - pDataStart;
-}
-
-static int fw_parse_configuration_data(struct tas2559_priv *pTAS2559,
-				       struct TFirmware *pFirmware, unsigned char *pData)
-{
-	unsigned char *pDataStart = pData;
-	unsigned int n;
-	unsigned int nConfiguration;
-	struct TConfiguration *pConfiguration;
-
-	pFirmware->mnConfigurations = (pData[0] << 8) + pData[1];
-	pData += 2;
-
-	if (pFirmware->mnConfigurations == 0)
-		goto end;
-
-	pFirmware->mpConfigurations =
-		kmalloc(sizeof(struct TConfiguration) * pFirmware->mnConfigurations,
-			GFP_KERNEL);
-
-	for (nConfiguration = 0; nConfiguration < pFirmware->mnConfigurations;
-	     nConfiguration++) {
-		pConfiguration = &(pFirmware->mpConfigurations[nConfiguration]);
-		memcpy(pConfiguration->mpName, pData, 64);
-		pData += 64;
-
-		n = strlen(pData);
-		pConfiguration->mpDescription = kmemdup(pData, n + 1, GFP_KERNEL);
-		pData += n + 1;
-
-		if ((pFirmware->mnDriverVersion >= PPC_DRIVER_CONFDEV)
-		    || ((pFirmware->mnDriverVersion >= PPC_DRIVER_CFGDEV_NONCRC)
-			&& (pFirmware->mnDriverVersion < PPC_DRIVER_CRCCHK))) {
-			pConfiguration->mnDevices = (pData[0] << 8) + pData[1];
-			pData += 2;
-		} else
-			pConfiguration->mnDevices = DevBoth;
-
-		pConfiguration->mnProgram = pData[0];
-		pData++;
-
-		pConfiguration->mnPLL = pData[0];
-		pData++;
-
-		pConfiguration->mnSamplingRate = fw_convert_number(pData);
-		pData += 4;
-
-		if (pFirmware->mnDriverVersion >= PPC_DRIVER_MTPLLSRC) {
-			pConfiguration->mnPLLSrc = pData[0];
-			pData++;
-
-			pConfiguration->mnPLLSrcRate = fw_convert_number(pData);
-			pData += 4;
-			dev_err(pTAS2559->dev, "line:%d, pData: 0x%x, 0x%x, 0x%x, 0x%x", __LINE__, pData[0], pData[1], pData[2], pData[3]);
+	if (pFirmware->mpCalibrations != NULL) {
+		for (n = 0; n < pFirmware->mnCalibrations; n++) {
+			kfree(pFirmware->mpCalibrations[n].mpDescription);
+			kfree(pFirmware->mpCalibrations[n].mData.mpDescription);
+
+			for (nn = 0; nn < pFirmware->mpCalibrations[n].mData.mnBlocks; nn++)
+				kfree(pFirmware->mpCalibrations[n].mData.mpBlocks[nn].mpData);
+
+			kfree(pFirmware->mpCalibrations[n].mData.mpBlocks);
 		}
 
-		n = fw_parse_data(pTAS2559, pFirmware, &(pConfiguration->mData), pData);
-		pData += n;
+		kfree(pFirmware->mpCalibrations);
 	}
 
-end:
-
-	return pData - pDataStart;
+	memset(pFirmware, 0x00, sizeof(struct TFirmware));
 }
 
-static int fw_parse_calibration_data(struct tas2559_priv *pTAS2559,
-			      struct TFirmware *pFirmware, unsigned char *pData)
-{
-	unsigned char *pDataStart = pData;
-	unsigned int n;
-	unsigned int nCalibration;
-	struct TCalibration *pCalibration;
-
-	pFirmware->mnCalibrations = (pData[0] << 8) + pData[1];
-	pData += 2;
-
-	if (pFirmware->mnCalibrations == 0)
-		goto end;
-
-	pFirmware->mpCalibrations =
-		kmalloc(sizeof(struct TCalibration) * pFirmware->mnCalibrations, GFP_KERNEL);
-
-	for (nCalibration = 0;
-	     nCalibration < pFirmware->mnCalibrations;
-	     nCalibration++) {
-		pCalibration = &(pFirmware->mpCalibrations[nCalibration]);
-		memcpy(pCalibration->mpName, pData, 64);
-		pData += 64;
-
-		n = strlen(pData);
-		pCalibration->mpDescription = kmemdup(pData, n + 1, GFP_KERNEL);
-		pData += n + 1;
-
-		pCalibration->mnProgram = pData[0];
-		pData++;
-
-		pCalibration->mnConfiguration = pData[0];
-		pData++;
-
-		n = fw_parse_data(pTAS2559, pFirmware, &(pCalibration->mData), pData);
-		pData += n;
-	}
-
-end:
-
-	return pData - pDataStart;
-}
-
-static int fw_parse(struct tas2559_priv *pTAS2559,
-		    struct TFirmware *pFirmware, unsigned char *pData, unsigned int nSize)
-{
-	int nPosition = 0;
-
-	nPosition = fw_parse_header(pTAS2559, pFirmware, pData, nSize);
-
-	if (nPosition < 0) {
-		dev_err(pTAS2559->dev, "Firmware: Wrong Header");
-		return -EINVAL;
-	}
-
-	if (nPosition >= nSize) {
-		dev_err(pTAS2559->dev, "Firmware: Too short");
-		return -EINVAL;
-	}
-
-	pData += nPosition;
-	nSize -= nPosition;
-	nPosition = 0;
-
-	nPosition = fw_parse_pll_data(pTAS2559, pFirmware, pData);
-
-	pData += nPosition;
-	nSize -= nPosition;
-	nPosition = 0;
-
-	nPosition = fw_parse_program_data(pTAS2559, pFirmware, pData);
-
-	pData += nPosition;
-	nSize -= nPosition;
-	nPosition = 0;
-
-	nPosition = fw_parse_configuration_data(pTAS2559, pFirmware, pData);
-
-	pData += nPosition;
-	nSize -= nPosition;
-	nPosition = 0;
-
-	if (nSize > 64)
-		nPosition = fw_parse_calibration_data(pTAS2559, pFirmware, pData);
-
-	return 0;
-}
 
 static int DevAPageYRAM(struct tas2559_priv *pTAS2559,
 			struct TYCRC *pCRCData,
@@ -2396,7 +1809,6 @@ static int isInBlockYRAM(struct tas2559_priv *pTAS2559,
 
 	return nResult;
 }
-
 
 static int isYRAM(struct tas2559_priv *pTAS2559,
 		  enum channel dev, struct TYCRC *pCRCData,
@@ -2783,6 +2195,278 @@ static int tas2559_load_data(struct tas2559_priv *pTAS2559, struct TData *pData,
 	return nResult;
 }
 
+static void failsafe(struct tas2559_priv *pTAS2559)
+{
+	dev_err(pTAS2559->dev, "%s\n", __func__);
+	pTAS2559->mnErrCode |= ERROR_FAILSAFE;
+
+	if (hrtimer_active(&pTAS2559->mtimer))
+		hrtimer_cancel(&pTAS2559->mtimer);
+
+	if(pTAS2559->mnRestart < RESTART_MAX)
+	{
+		pTAS2559->mnRestart ++;
+		msleep(100);
+		dev_err(pTAS2559->dev, "I2C COMM error, restart SmartAmp.\n");
+		schedule_delayed_work(&pTAS2559->irq_work, msecs_to_jiffies(100));
+		return;
+	}
+
+	tas2559_enableIRQ(pTAS2559, DevBoth, false);
+	tas2559_DevShutdown(pTAS2559, DevBoth);
+	pTAS2559->mbPowerUp = false;
+	tas2559_hw_reset(pTAS2559);
+	tas2559_dev_write(pTAS2559, DevBoth, TAS2559_SW_RESET_REG, 0x01);
+	msleep(1);
+	tas2559_dev_write(pTAS2559, DevA, TAS2559_SPK_CTRL_REG, 0x04);
+	tas2559_dev_write(pTAS2559, DevB, TAS2560_SPK_CTRL_REG, 0x50);
+
+	if (pTAS2559->mpFirmware != NULL)
+		tas2559_clear_firmware(pTAS2559->mpFirmware);
+}
+
+int tas2559_checkPLL(struct tas2559_priv *pTAS2559)
+{
+	int nResult = 0;
+	/*
+	* TO DO
+	*/
+
+	return nResult;
+}
+
+int tas2559_set_calibration(struct tas2559_priv *pTAS2559, int nCalibration)
+{
+	struct TCalibration *pCalibration = NULL;
+	struct TConfiguration *pConfiguration;
+	struct TProgram *pProgram;
+	int nResult = 0;
+
+	if ((!pTAS2559->mpFirmware->mpPrograms)
+	    || (!pTAS2559->mpFirmware->mpConfigurations)) {
+		dev_err(pTAS2559->dev, "Firmware not loaded\n\r");
+		nResult = 0;
+		goto end;
+	}
+
+	if (nCalibration >= pTAS2559->mpCalFirmware->mnCalibrations) {
+		dev_err(pTAS2559->dev,
+			"Calibration %d doesn't exist\n", nCalibration);
+		nResult = 0;
+		goto end;
+	}
+
+	pTAS2559->mnCurrentCalibration = nCalibration;
+
+	if (pTAS2559->mbLoadConfigurationPrePowerUp)
+		goto end;
+
+	pCalibration = &(pTAS2559->mpCalFirmware->mpCalibrations[nCalibration]);
+	pProgram = &(pTAS2559->mpFirmware->mpPrograms[pTAS2559->mnCurrentProgram]);
+	pConfiguration = &(pTAS2559->mpFirmware->mpConfigurations[pTAS2559->mnCurrentConfiguration]);
+
+	if (pProgram->mnAppMode == TAS2559_APP_TUNINGMODE) {
+		dev_dbg(pTAS2559->dev, "Enable: load calibration\n");
+		nResult = tas2559_load_data(pTAS2559, &(pCalibration->mData), TAS2559_BLOCK_CFG_COEFF_DEV_A);
+	}
+
+end:
+
+	if (nResult < 0) {
+		tas2559_clear_firmware(pTAS2559->mpCalFirmware);
+	}
+
+	return nResult;
+}
+
+/*
+* tas2559_load_coefficient
+*/
+static int tas2559_load_coefficient(struct tas2559_priv *pTAS2559,
+				    int nPrevConfig, int nNewConfig, bool bPowerOn)
+{
+	int nResult = 0;
+	struct TPLL *pPLL;
+	struct TProgram *pProgram = NULL;
+	struct TConfiguration *pPrevConfiguration;
+	struct TConfiguration *pNewConfiguration;
+	enum channel chl;
+	bool bRestorePower = false;
+
+	dev_dbg(pTAS2559->dev, "%s, Prev=%d, new=%d, Pow=%d\n",
+		__func__, nPrevConfig, nNewConfig, bPowerOn);
+
+	if (!pTAS2559->mpFirmware->mnConfigurations) {
+		dev_err(pTAS2559->dev, "%s, firmware not loaded\n", __func__);
+		goto end;
+	}
+
+	if (nNewConfig >= pTAS2559->mpFirmware->mnConfigurations) {
+		dev_err(pTAS2559->dev, "%s, invalid configuration New=%d, total=%d\n",
+			__func__, nNewConfig, pTAS2559->mpFirmware->mnConfigurations);
+		goto end;
+	}
+
+	if (nPrevConfig < 0) {
+		pPrevConfiguration = NULL;
+		chl = DevBoth;
+	} else
+		if (nPrevConfig == nNewConfig) {
+			dev_dbg(pTAS2559->dev, "%d configuration is already loaded\n", nNewConfig);
+			goto end;
+		} else {
+			pPrevConfiguration = &(pTAS2559->mpFirmware->mpConfigurations[nPrevConfig]);
+			chl = pPrevConfiguration->mnDevices;
+		}
+
+	pNewConfiguration = &(pTAS2559->mpFirmware->mpConfigurations[nNewConfig]);
+	pTAS2559->mnCurrentConfiguration = nNewConfig;
+
+	if (pPrevConfiguration) {
+		if ((pPrevConfiguration->mnPLL == pNewConfiguration->mnPLL)
+		    && (pPrevConfiguration->mnDevices == pNewConfiguration->mnDevices)) {
+			dev_dbg(pTAS2559->dev, "%s, PLL and device same\n", __func__);
+			goto prog_coefficient;
+		}
+	}
+
+	pProgram = &(pTAS2559->mpFirmware->mpPrograms[pTAS2559->mnCurrentProgram]);
+
+	if (bPowerOn) {
+		if (hrtimer_active(&pTAS2559->mtimer))
+			hrtimer_cancel(&pTAS2559->mtimer);
+
+		if (pProgram->mnAppMode == TAS2559_APP_TUNINGMODE)
+			tas2559_enableIRQ(pTAS2559, DevBoth, false);
+
+		nResult = tas2559_DevShutdown(pTAS2559, chl);
+
+		if (nResult < 0)
+			goto end;
+
+		bRestorePower = true;
+	}
+
+	/* load PLL */
+	pPLL = &(pTAS2559->mpFirmware->mpPLLs[pNewConfiguration->mnPLL]);
+	dev_dbg(pTAS2559->dev, "load PLL: %s block for Configuration %s\n",
+		pPLL->mpName, pNewConfiguration->mpName);
+	nResult = tas2559_load_block(pTAS2559, &(pPLL->mBlock));
+
+	if (nResult < 0)
+		goto end;
+
+	pTAS2559->mnCurrentSampleRate = pNewConfiguration->mnSamplingRate;
+
+	dev_dbg(pTAS2559->dev, "load configuration %s conefficient pre block\n",
+		pNewConfiguration->mpName);
+
+	if (pNewConfiguration->mnDevices & DevA) {
+		nResult = tas2559_load_data(pTAS2559, &(pNewConfiguration->mData), TAS2559_BLOCK_CFG_PRE_DEV_A);
+
+		if (nResult < 0)
+			goto end;
+	}
+
+	if (pNewConfiguration->mnDevices & DevB) {
+		nResult = tas2559_load_data(pTAS2559, &(pNewConfiguration->mData), TAS2559_BLOCK_CFG_PRE_DEV_B);
+
+		if (nResult < 0)
+			goto end;
+	}
+
+prog_coefficient:
+	dev_dbg(pTAS2559->dev, "load new configuration: %s, coeff block data\n",
+		pNewConfiguration->mpName);
+
+	if (pNewConfiguration->mnDevices & DevA) {
+		nResult = tas2559_load_data(pTAS2559, &(pNewConfiguration->mData),
+					    TAS2559_BLOCK_CFG_COEFF_DEV_A);
+		if (nResult < 0)
+			goto end;
+	}
+
+	if (pNewConfiguration->mnDevices & DevB) {
+		nResult = tas2559_load_data(pTAS2559, &(pNewConfiguration->mData),
+					    TAS2559_BLOCK_CFG_COEFF_DEV_B);
+		if (nResult < 0)
+			goto end;
+	}
+
+	if (pTAS2559->mnChannelState == TAS2559_AD_BD) {
+		nResult = tas2559_dev_bulk_read(pTAS2559,
+				DevA, TAS2559_SA_CHL_CTRL_REG, pTAS2559->mnDefaultChlData, 16);
+		if (nResult < 0)
+			goto end;
+	} else {
+		nResult = tas2559_SA_DevChnSetup(pTAS2559, pTAS2559->mnChannelState);
+		if (nResult < 0)
+			goto end;
+	}
+
+	if (pTAS2559->mpCalFirmware->mnCalibrations) {
+		nResult = tas2559_set_calibration(pTAS2559, pTAS2559->mnCurrentCalibration);
+		if (nResult < 0)
+			goto end;
+	}
+
+	if (bRestorePower) {
+		dev_dbg(pTAS2559->dev, "%s, set vboost, before power on %d\n",
+			__func__, pTAS2559->mnVBoostState);
+		nResult = tas2559_set_VBoost(pTAS2559, pTAS2559->mnVBoostState, false);
+		if (nResult < 0)
+			goto end;
+
+		tas2559_clearIRQ(pTAS2559);
+		nResult = tas2559_DevStartup(pTAS2559, pNewConfiguration->mnDevices);
+		if (nResult < 0)
+			goto end;
+
+		if (pProgram->mnAppMode == TAS2559_APP_TUNINGMODE) {
+			nResult = tas2559_checkPLL(pTAS2559);
+
+			if (nResult < 0) {
+				nResult = tas2559_DevShutdown(pTAS2559, pNewConfiguration->mnDevices);
+				pTAS2559->mbPowerUp = false;
+				goto end;
+			}
+		}
+
+		if (pNewConfiguration->mnDevices & DevB) {
+			nResult = tas2559_load_data(pTAS2559, &(pNewConfiguration->mData),
+						    TAS2559_BLOCK_PST_POWERUP_DEV_B);
+
+			if (nResult < 0)
+				goto end;
+		}
+
+		dev_dbg(pTAS2559->dev,
+			"device powered up, load unmute\n");
+		nResult = tas2559_DevMute(pTAS2559, pNewConfiguration->mnDevices, false);
+
+		if (nResult < 0)
+			goto end;
+
+		if (pProgram->mnAppMode == TAS2559_APP_TUNINGMODE) {
+			tas2559_enableIRQ(pTAS2559, pNewConfiguration->mnDevices, true);
+
+			if (!hrtimer_active(&pTAS2559->mtimer)) {
+				pTAS2559->mnDieTvReadCounter = 0;
+				hrtimer_start(&pTAS2559->mtimer,
+					      ns_to_ktime((u64)LOW_TEMPERATURE_CHECK_PERIOD * NSEC_PER_MSEC), HRTIMER_MODE_REL);
+			}
+		}
+	}
+
+end:
+
+	if (nResult < 0)
+		dev_err(pTAS2559->dev, "%s, load new conf %s error\n", __func__, pNewConfiguration->mpName);
+
+	pTAS2559->mnNewConfiguration = pTAS2559->mnCurrentConfiguration;
+	return nResult;
+}
+
 static int tas2559_load_configuration(struct tas2559_priv *pTAS2559,
 				      unsigned int nConfiguration, bool bLoadSame)
 {
@@ -2854,168 +2538,6 @@ end:
 	}
 
 	return nResult;
-}
-
-int tas2559_set_config(struct tas2559_priv *pTAS2559, int config)
-{
-	struct TConfiguration *pConfiguration;
-	struct TProgram *pProgram;
-	unsigned int nProgram = pTAS2559->mnCurrentProgram;
-	unsigned int nConfiguration = config;
-	int nResult = 0;
-
-	if ((!pTAS2559->mpFirmware->mpPrograms) ||
-	    (!pTAS2559->mpFirmware->mpConfigurations)) {
-		dev_err(pTAS2559->dev, "Firmware not loaded\n");
-		nResult = -EINVAL;
-		goto end;
-	}
-
-	if (nConfiguration >= pTAS2559->mpFirmware->mnConfigurations) {
-		dev_err(pTAS2559->dev, "Configuration %d doesn't exist\n",
-			nConfiguration);
-		nResult = -EINVAL;
-		goto end;
-	}
-
-	pConfiguration = &(pTAS2559->mpFirmware->mpConfigurations[nConfiguration]);
-	pProgram = &(pTAS2559->mpFirmware->mpPrograms[nProgram]);
-
-	if (nProgram != pConfiguration->mnProgram) {
-		dev_err(pTAS2559->dev,
-			"Configuration %d, %s with Program %d isn't compatible with existing Program %d, %s\n",
-			nConfiguration, pConfiguration->mpName, pConfiguration->mnProgram,
-			nProgram, pProgram->mpName);
-		nResult = -EINVAL;
-		goto end;
-	}
-
-	dev_dbg(pTAS2559->dev, "%s, load new conf %s\n", __func__, pConfiguration->mpName);
-	nResult = tas2559_load_configuration(pTAS2559, nConfiguration, false);
-
-end:
-
-	return nResult;
-}
-
-void tas2559_clear_firmware(struct TFirmware *pFirmware)
-{
-	unsigned int n, nn;
-
-	if (!pFirmware)
-		return;
-
-	kfree(pFirmware->mpDescription);
-
-	if (pFirmware->mpPLLs != NULL) {
-		for (n = 0; n < pFirmware->mnPLLs; n++) {
-			kfree(pFirmware->mpPLLs[n].mpDescription);
-			kfree(pFirmware->mpPLLs[n].mBlock.mpData);
-		}
-
-		kfree(pFirmware->mpPLLs);
-	}
-
-	if (pFirmware->mpPrograms != NULL) {
-		for (n = 0; n < pFirmware->mnPrograms; n++) {
-			kfree(pFirmware->mpPrograms[n].mpDescription);
-			kfree(pFirmware->mpPrograms[n].mData.mpDescription);
-
-			for (nn = 0; nn < pFirmware->mpPrograms[n].mData.mnBlocks; nn++)
-				kfree(pFirmware->mpPrograms[n].mData.mpBlocks[nn].mpData);
-
-			kfree(pFirmware->mpPrograms[n].mData.mpBlocks);
-		}
-
-		kfree(pFirmware->mpPrograms);
-	}
-
-	if (pFirmware->mpConfigurations != NULL) {
-		for (n = 0; n < pFirmware->mnConfigurations; n++) {
-			kfree(pFirmware->mpConfigurations[n].mpDescription);
-			kfree(pFirmware->mpConfigurations[n].mData.mpDescription);
-
-			for (nn = 0; nn < pFirmware->mpConfigurations[n].mData.mnBlocks; nn++)
-				kfree(pFirmware->mpConfigurations[n].mData.mpBlocks[nn].mpData);
-
-			kfree(pFirmware->mpConfigurations[n].mData.mpBlocks);
-		}
-
-		kfree(pFirmware->mpConfigurations);
-	}
-
-	if (pFirmware->mpCalibrations != NULL) {
-		for (n = 0; n < pFirmware->mnCalibrations; n++) {
-			kfree(pFirmware->mpCalibrations[n].mpDescription);
-			kfree(pFirmware->mpCalibrations[n].mData.mpDescription);
-
-			for (nn = 0; nn < pFirmware->mpCalibrations[n].mData.mnBlocks; nn++)
-				kfree(pFirmware->mpCalibrations[n].mData.mpBlocks[nn].mpData);
-
-			kfree(pFirmware->mpCalibrations[n].mData.mpBlocks);
-		}
-
-		kfree(pFirmware->mpCalibrations);
-	}
-
-	memset(pFirmware, 0x00, sizeof(struct TFirmware));
-}
-
-void tas2559_fw_ready(const struct firmware *pFW, void *pContext)
-{
-	struct tas2559_priv *pTAS2559 = (struct tas2559_priv *) pContext;
-	int nResult;
-	unsigned int nProgram = 0;
-	unsigned int nSampleRate = 0;
-
-	mutex_lock(&pTAS2559->codec_lock);
-
-	dev_info(pTAS2559->dev, "%s:\n", __func__);
-
-	if (unlikely(!pFW) || unlikely(!pFW->data)) {
-		dev_err(pTAS2559->dev, "%s firmware is not loaded.\n",
-			TAS2559_FW_NAME);
-		goto end;
-	}
-
-	if (pTAS2559->mpFirmware->mpConfigurations) {
-		nProgram = pTAS2559->mnCurrentProgram;
-		nSampleRate = pTAS2559->mnCurrentSampleRate;
-		dev_dbg(pTAS2559->dev, "clear current firmware\n");
-		tas2559_clear_firmware(pTAS2559->mpFirmware);
-	}
-
-	nResult = fw_parse(pTAS2559, pTAS2559->mpFirmware, (unsigned char *)(pFW->data), pFW->size);
-	release_firmware(pFW);
-
-	if (nResult < 0) {
-		dev_err(pTAS2559->dev, "firmware is corrupt\n");
-		goto end;
-	}
-
-	if (!pTAS2559->mpFirmware->mnPrograms) {
-		dev_err(pTAS2559->dev, "firmware contains no programs\n");
-		nResult = -EINVAL;
-		goto end;
-	}
-
-	if (!pTAS2559->mpFirmware->mnConfigurations) {
-		dev_err(pTAS2559->dev, "firmware contains no configurations\n");
-		nResult = -EINVAL;
-		goto end;
-	}
-
-	if (nProgram >= pTAS2559->mpFirmware->mnPrograms) {
-		dev_info(pTAS2559->dev,
-			 "no previous program, set to default\n");
-		nProgram = 0;
-	}
-
-	pTAS2559->mnCurrentSampleRate = nSampleRate;
-	nResult = tas2559_set_program(pTAS2559, nProgram, -1);
-
-end:
-	mutex_unlock(&pTAS2559->codec_lock);
 }
 
 int tas2559_set_program(struct tas2559_priv *pTAS2559,
@@ -3186,47 +2708,683 @@ end:
 	return nResult;
 }
 
-int tas2559_set_calibration(struct tas2559_priv *pTAS2559, int nCalibration)
+static void fw_print_header(struct tas2559_priv *pTAS2559, struct TFirmware *pFirmware)
 {
-	struct TCalibration *pCalibration = NULL;
-	struct TConfiguration *pConfiguration;
-	struct TProgram *pProgram;
-	int nResult = 0;
+	dev_info(pTAS2559->dev, "FW Size       = %d", pFirmware->mnFWSize);
+	dev_info(pTAS2559->dev, "Checksum      = 0x%04X", pFirmware->mnChecksum);
+	dev_info(pTAS2559->dev, "PPC Version   = 0x%04X", pFirmware->mnPPCVersion);
+	dev_info(pTAS2559->dev, "FW  Version    = 0x%04X", pFirmware->mnFWVersion);
+	dev_info(pTAS2559->dev, "Driver Version= 0x%04X", pFirmware->mnDriverVersion);
+	dev_info(pTAS2559->dev, "Timestamp     = %d", pFirmware->mnTimeStamp);
+	dev_info(pTAS2559->dev, "DDC Name      = %s", pFirmware->mpDDCName);
+	dev_info(pTAS2559->dev, "Description   = %s", pFirmware->mpDescription);
+}
 
-	if ((!pTAS2559->mpFirmware->mpPrograms)
-	    || (!pTAS2559->mpFirmware->mpConfigurations)) {
-		dev_err(pTAS2559->dev, "Firmware not loaded\n\r");
-		nResult = 0;
-		goto end;
+static inline unsigned int fw_convert_number(unsigned char *pData)
+{
+	return pData[3] + (pData[2] << 8) + (pData[1] << 16) + (pData[0] << 24);
+}
+
+static int fw_parse_header(struct tas2559_priv *pTAS2559,
+			   struct TFirmware *pFirmware, unsigned char *pData, unsigned int nSize)
+{
+	unsigned char *pDataStart = pData;
+	unsigned int n;
+	unsigned char pMagicNumber[] = { 0x35, 0x35, 0x35, 0x32 };
+
+	if (nSize < 104) {
+		dev_err(pTAS2559->dev, "Firmware: Header too short");
+		return -EINVAL;
 	}
 
-	if (nCalibration >= pTAS2559->mpCalFirmware->mnCalibrations) {
+	if (memcmp(pData, pMagicNumber, 4)) {
+		dev_err(pTAS2559->dev, "Firmware: Magic number doesn't match");
+		return -EINVAL;
+	}
+
+	pData += 4;
+
+	pFirmware->mnFWSize = fw_convert_number(pData);
+	pData += 4;
+
+	pFirmware->mnChecksum = fw_convert_number(pData);
+	pData += 4;
+
+	pFirmware->mnPPCVersion = fw_convert_number(pData);
+	pData += 4;
+
+	pFirmware->mnFWVersion = fw_convert_number(pData);
+	pData += 4;
+
+	pFirmware->mnDriverVersion = fw_convert_number(pData);
+	dev_err(pTAS2559->dev, "Firmware driver: 0x%x", pFirmware->mnDriverVersion);
+	pData += 4;
+
+	pFirmware->mnTimeStamp = fw_convert_number(pData);
+	pData += 4;
+
+	memcpy(pFirmware->mpDDCName, pData, 64);
+	pData += 64;
+
+	n = strlen(pData);
+	pFirmware->mpDescription = kmemdup(pData, n + 1, GFP_KERNEL);
+	pData += n + 1;
+
+	if ((pData - pDataStart) >= nSize) {
+		dev_err(pTAS2559->dev, "Firmware: Header too short after DDC description");
+		return -EINVAL;
+	}
+
+	pFirmware->mnDeviceFamily = fw_convert_number(pData);
+	pData += 4;
+
+	if (pFirmware->mnDeviceFamily != 0) {
 		dev_err(pTAS2559->dev,
-			"Calibration %d doesn't exist\n", nCalibration);
-		nResult = 0;
-		goto end;
+			"deviceFamily %d, not TAS device", pFirmware->mnDeviceFamily);
+		return -EINVAL;
 	}
 
-	pTAS2559->mnCurrentCalibration = nCalibration;
+	pFirmware->mnDevice = fw_convert_number(pData);
+	pData += 4;
 
-	if (pTAS2559->mbLoadConfigurationPrePowerUp)
+	if (pFirmware->mnDevice != 4) {
+		dev_err(pTAS2559->dev,
+			"device %d, not TAS2559", pFirmware->mnDevice);
+		return -EINVAL;
+	}
+
+	fw_print_header(pTAS2559, pFirmware);
+
+	return pData - pDataStart;
+}
+
+static int fw_parse_block_data(struct tas2559_priv *pTAS2559, struct TFirmware *pFirmware,
+			       struct TBlock *pBlock, unsigned char *pData)
+{
+	unsigned char *pDataStart = pData;
+	unsigned int n;
+
+	pBlock->mnType = fw_convert_number(pData);
+	pData += 4;
+
+	if (pFirmware->mnDriverVersion >= PPC_DRIVER_CRCCHK) {
+		pBlock->mbPChkSumPresent = pData[0];
+		pData++;
+
+		pBlock->mnPChkSum = pData[0];
+		pData++;
+
+		pBlock->mbYChkSumPresent = pData[0];
+		pData++;
+
+		pBlock->mnYChkSum = pData[0];
+		pData++;
+	} else {
+		pBlock->mbPChkSumPresent = 0;
+		pBlock->mbYChkSumPresent = 0;
+	}
+
+	pBlock->mnCommands = fw_convert_number(pData);
+	pData += 4;
+
+	n = pBlock->mnCommands * 4;
+	pBlock->mpData = kmemdup(pData, n, GFP_KERNEL);
+	pData += n;
+
+	return pData - pDataStart;
+}
+
+static int fw_parse_data(struct tas2559_priv *pTAS2559, struct TFirmware *pFirmware,
+			 struct TData *pImageData, unsigned char *pData)
+{
+	unsigned char *pDataStart = pData;
+	unsigned int nBlock;
+	unsigned int n;
+
+	memcpy(pImageData->mpName, pData, 64);
+	pData += 64;
+
+	n = strlen(pData);
+	pImageData->mpDescription = kmemdup(pData, n + 1, GFP_KERNEL);
+	pData += n + 1;
+
+	pImageData->mnBlocks = (pData[0] << 8) + pData[1];
+	pData += 2;
+
+	pImageData->mpBlocks =
+		kmalloc(sizeof(struct TBlock) * pImageData->mnBlocks, GFP_KERNEL);
+
+	for (nBlock = 0; nBlock < pImageData->mnBlocks; nBlock++) {
+		n = fw_parse_block_data(pTAS2559, pFirmware,
+					&(pImageData->mpBlocks[nBlock]), pData);
+		pData += n;
+	}
+
+	return pData - pDataStart;
+}
+
+static int fw_parse_pll_data(struct tas2559_priv *pTAS2559,
+			     struct TFirmware *pFirmware, unsigned char *pData)
+{
+	unsigned char *pDataStart = pData;
+	unsigned int n;
+	unsigned int nPLL;
+	struct TPLL *pPLL;
+
+	pFirmware->mnPLLs = (pData[0] << 8) + pData[1];
+	pData += 2;
+
+	if (pFirmware->mnPLLs == 0)
 		goto end;
 
-	pCalibration = &(pTAS2559->mpCalFirmware->mpCalibrations[nCalibration]);
-	pProgram = &(pTAS2559->mpFirmware->mpPrograms[pTAS2559->mnCurrentProgram]);
-	pConfiguration = &(pTAS2559->mpFirmware->mpConfigurations[pTAS2559->mnCurrentConfiguration]);
+	pFirmware->mpPLLs = kmalloc_array(pFirmware->mnPLLs, sizeof(struct TPLL), GFP_KERNEL);
 
-	if (pProgram->mnAppMode == TAS2559_APP_TUNINGMODE) {
-		dev_dbg(pTAS2559->dev, "Enable: load calibration\n");
-		nResult = tas2559_load_data(pTAS2559, &(pCalibration->mData), TAS2559_BLOCK_CFG_COEFF_DEV_A);
+	for (nPLL = 0; nPLL < pFirmware->mnPLLs; nPLL++) {
+		pPLL = &(pFirmware->mpPLLs[nPLL]);
+
+		memcpy(pPLL->mpName, pData, 64);
+		pData += 64;
+
+		n = strlen(pData);
+		pPLL->mpDescription = kmemdup(pData, n + 1, GFP_KERNEL);
+		pData += n + 1;
+
+		n = fw_parse_block_data(pTAS2559, pFirmware, &(pPLL->mBlock), pData);
+		pData += n;
+	}
+
+end:
+	return pData - pDataStart;
+}
+
+static int fw_parse_program_data(struct tas2559_priv *pTAS2559,
+				 struct TFirmware *pFirmware, unsigned char *pData)
+{
+	unsigned char *pDataStart = pData;
+	unsigned int n;
+	unsigned int nProgram;
+	struct TProgram *pProgram;
+
+	pFirmware->mnPrograms = (pData[0] << 8) + pData[1];
+	pData += 2;
+
+	if (pFirmware->mnPrograms == 0)
+		goto end;
+
+	pFirmware->mpPrograms =
+		kmalloc(sizeof(struct TProgram) * pFirmware->mnPrograms, GFP_KERNEL);
+
+	for (nProgram = 0; nProgram < pFirmware->mnPrograms; nProgram++) {
+		pProgram = &(pFirmware->mpPrograms[nProgram]);
+		memcpy(pProgram->mpName, pData, 64);
+		pData += 64;
+
+		n = strlen(pData);
+		pProgram->mpDescription = kmemdup(pData, n + 1, GFP_KERNEL);
+		pData += n + 1;
+
+		pProgram->mnAppMode = pData[0];
+		pData++;
+
+		pProgram->mnBoost = (pData[0] << 8) + pData[1];
+		pData += 2;
+
+		n = fw_parse_data(pTAS2559, pFirmware, &(pProgram->mData), pData);
+		pData += n;
 	}
 
 end:
 
-	if (nResult < 0) {
-		tas2559_clear_firmware(pTAS2559->mpCalFirmware);
-		nResult = tas2559_set_program(pTAS2559, pTAS2559->mnCurrentProgram, pTAS2559->mnCurrentConfiguration);
+	return pData - pDataStart;
+}
+
+static int fw_parse_configuration_data(struct tas2559_priv *pTAS2559,
+				       struct TFirmware *pFirmware, unsigned char *pData)
+{
+	unsigned char *pDataStart = pData;
+	unsigned int n;
+	unsigned int nConfiguration;
+	struct TConfiguration *pConfiguration;
+
+	pFirmware->mnConfigurations = (pData[0] << 8) + pData[1];
+	pData += 2;
+
+	if (pFirmware->mnConfigurations == 0)
+		goto end;
+
+	pFirmware->mpConfigurations =
+		kmalloc(sizeof(struct TConfiguration) * pFirmware->mnConfigurations,
+			GFP_KERNEL);
+
+	for (nConfiguration = 0; nConfiguration < pFirmware->mnConfigurations;
+	     nConfiguration++) {
+		pConfiguration = &(pFirmware->mpConfigurations[nConfiguration]);
+		memcpy(pConfiguration->mpName, pData, 64);
+		pData += 64;
+
+		n = strlen(pData);
+		pConfiguration->mpDescription = kmemdup(pData, n + 1, GFP_KERNEL);
+		pData += n + 1;
+
+		if ((pFirmware->mnDriverVersion >= PPC_DRIVER_CONFDEV)
+		    || ((pFirmware->mnDriverVersion >= PPC_DRIVER_CFGDEV_NONCRC)
+			&& (pFirmware->mnDriverVersion < PPC_DRIVER_CRCCHK))) {
+			pConfiguration->mnDevices = (pData[0] << 8) + pData[1];
+			pData += 2;
+		} else
+			pConfiguration->mnDevices = DevBoth;
+
+		pConfiguration->mnProgram = pData[0];
+		pData++;
+
+		pConfiguration->mnPLL = pData[0];
+		pData++;
+
+		pConfiguration->mnSamplingRate = fw_convert_number(pData);
+		pData += 4;
+
+		if (pFirmware->mnDriverVersion >= PPC_DRIVER_MTPLLSRC) {
+			pConfiguration->mnPLLSrc = pData[0];
+			pData++;
+
+			pConfiguration->mnPLLSrcRate = fw_convert_number(pData);
+			pData += 4;
+			dev_err(pTAS2559->dev, "line:%d, pData: 0x%x, 0x%x, 0x%x, 0x%x", __LINE__, pData[0], pData[1], pData[2], pData[3]);
+		}
+
+		n = fw_parse_data(pTAS2559, pFirmware, &(pConfiguration->mData), pData);
+		pData += n;
 	}
+
+end:
+
+	return pData - pDataStart;
+}
+
+static int fw_parse_calibration_data(struct tas2559_priv *pTAS2559,
+			      struct TFirmware *pFirmware, unsigned char *pData)
+{
+	unsigned char *pDataStart = pData;
+	unsigned int n;
+	unsigned int nCalibration;
+	struct TCalibration *pCalibration;
+
+	pFirmware->mnCalibrations = (pData[0] << 8) + pData[1];
+	pData += 2;
+
+	if (pFirmware->mnCalibrations == 0)
+		goto end;
+
+	pFirmware->mpCalibrations =
+		kmalloc(sizeof(struct TCalibration) * pFirmware->mnCalibrations, GFP_KERNEL);
+
+	for (nCalibration = 0;
+	     nCalibration < pFirmware->mnCalibrations;
+	     nCalibration++) {
+		pCalibration = &(pFirmware->mpCalibrations[nCalibration]);
+		memcpy(pCalibration->mpName, pData, 64);
+		pData += 64;
+
+		n = strlen(pData);
+		pCalibration->mpDescription = kmemdup(pData, n + 1, GFP_KERNEL);
+		pData += n + 1;
+
+		pCalibration->mnProgram = pData[0];
+		pData++;
+
+		pCalibration->mnConfiguration = pData[0];
+		pData++;
+
+		n = fw_parse_data(pTAS2559, pFirmware, &(pCalibration->mData), pData);
+		pData += n;
+	}
+
+end:
+
+	return pData - pDataStart;
+}
+
+static int fw_parse(struct tas2559_priv *pTAS2559,
+		    struct TFirmware *pFirmware, unsigned char *pData, unsigned int nSize)
+{
+	int nPosition = 0;
+
+	nPosition = fw_parse_header(pTAS2559, pFirmware, pData, nSize);
+
+	if (nPosition < 0) {
+		dev_err(pTAS2559->dev, "Firmware: Wrong Header");
+		return -EINVAL;
+	}
+
+	if (nPosition >= nSize) {
+		dev_err(pTAS2559->dev, "Firmware: Too short");
+		return -EINVAL;
+	}
+
+	pData += nPosition;
+	nSize -= nPosition;
+	nPosition = 0;
+
+	nPosition = fw_parse_pll_data(pTAS2559, pFirmware, pData);
+
+	pData += nPosition;
+	nSize -= nPosition;
+	nPosition = 0;
+
+	nPosition = fw_parse_program_data(pTAS2559, pFirmware, pData);
+
+	pData += nPosition;
+	nSize -= nPosition;
+	nPosition = 0;
+
+	nPosition = fw_parse_configuration_data(pTAS2559, pFirmware, pData);
+
+	pData += nPosition;
+	nSize -= nPosition;
+	nPosition = 0;
+
+	if (nSize > 64)
+		nPosition = fw_parse_calibration_data(pTAS2559, pFirmware, pData);
+
+	return 0;
+}
+
+void tas2559_fw_ready(const struct firmware *pFW, void *pContext)
+{
+	struct tas2559_priv *pTAS2559 = (struct tas2559_priv *) pContext;
+	int nResult;
+	unsigned int nProgram = 0;
+	unsigned int nSampleRate = 0;
+
+	mutex_lock(&pTAS2559->codec_lock);
+
+	dev_info(pTAS2559->dev, "%s:\n", __func__);
+
+	if (unlikely(!pFW) || unlikely(!pFW->data)) {
+		dev_err(pTAS2559->dev, "%s firmware is not loaded.\n",
+			TAS2559_FW_NAME);
+		goto end;
+	}
+
+	if (pTAS2559->mpFirmware->mpConfigurations) {
+		nProgram = pTAS2559->mnCurrentProgram;
+		nSampleRate = pTAS2559->mnCurrentSampleRate;
+		dev_dbg(pTAS2559->dev, "clear current firmware\n");
+		tas2559_clear_firmware(pTAS2559->mpFirmware);
+	}
+
+	nResult = fw_parse(pTAS2559, pTAS2559->mpFirmware, (unsigned char *)(pFW->data), pFW->size);
+	release_firmware(pFW);
+
+	if (nResult < 0) {
+		dev_err(pTAS2559->dev, "firmware is corrupt\n");
+		goto end;
+	}
+
+	if (!pTAS2559->mpFirmware->mnPrograms) {
+		dev_err(pTAS2559->dev, "firmware contains no programs\n");
+		nResult = -EINVAL;
+		goto end;
+	}
+
+	if (!pTAS2559->mpFirmware->mnConfigurations) {
+		dev_err(pTAS2559->dev, "firmware contains no configurations\n");
+		nResult = -EINVAL;
+		goto end;
+	}
+
+	if (nProgram >= pTAS2559->mpFirmware->mnPrograms) {
+		dev_info(pTAS2559->dev,
+			 "no previous program, set to default\n");
+		nProgram = 0;
+	}
+
+	pTAS2559->mnCurrentSampleRate = nSampleRate;
+	nResult = tas2559_set_program(pTAS2559, nProgram, -1);
+
+end:
+	mutex_unlock(&pTAS2559->codec_lock);
+}
+
+int tas2559_enable(struct tas2559_priv *pTAS2559, bool bEnable)
+{
+	int nResult = 0;
+	struct TProgram *pProgram;
+	struct TConfiguration *pConfiguration;
+	unsigned int nValue;
+
+	dev_dbg(pTAS2559->dev, "%s: %s\n", __func__, bEnable ? "On" : "Off");
+
+	if ((pTAS2559->mpFirmware->mnPrograms == 0)
+	    || (pTAS2559->mpFirmware->mnConfigurations == 0)) {
+		dev_err(pTAS2559->dev, "%s, firmware not loaded\n", __func__);
+		/*Load firmware*/
+		nResult = request_firmware_nowait(THIS_MODULE, 1, TAS2559_FW_NAME,
+			pTAS2559->dev, GFP_KERNEL, pTAS2559, tas2559_fw_ready);
+		if(nResult < 0) {
+			dev_err(pTAS2559->dev, "%s, firmware is loaded\n", __func__);
+			goto end;
+		}
+	}
+
+	/* check safe guard*/
+	nResult = tas2559_dev_read(pTAS2559, DevA, TAS2559_SAFE_GUARD_REG, &nValue);
+	if (nResult < 0)
+		goto end;
+	if ((nValue & 0xff) != TAS2559_SAFE_GUARD_PATTERN) {
+		dev_err(pTAS2559->dev, "ERROR DevA safe guard (0x%x) failure!\n", nValue);
+		nResult = -EPIPE;
+		pTAS2559->mnErrCode = ERROR_SAFE_GUARD;
+		pTAS2559->mbPowerUp = true;
+		goto end;
+	}
+
+	pProgram = &(pTAS2559->mpFirmware->mpPrograms[pTAS2559->mnCurrentProgram]);
+	if (bEnable) {
+		if (!pTAS2559->mbPowerUp) {
+			if (!pTAS2559->mbCalibrationLoaded) {
+				tas2559_set_calibration(pTAS2559, 0xFF);
+				pTAS2559->mbCalibrationLoaded = true;
+			}
+
+			tas2559_dev_read(pTAS2559, DevA, TAS2559_VBOOST_CTL_REG, &nValue);
+			dev_dbg(pTAS2559->dev, "VBoost ctrl register before coeff set: 0x%x\n", nValue);
+
+			if (pTAS2559->mbLoadConfigurationPrePowerUp) {
+				pTAS2559->mbLoadConfigurationPrePowerUp = false;
+				nResult = tas2559_load_coefficient(pTAS2559,
+								pTAS2559->mnCurrentConfiguration, pTAS2559->mnNewConfiguration, false);
+				if (pTAS2559->mnCurrentConfiguration != pTAS2559->mnNewConfiguration) {
+					pTAS2559->mbLoadVBoostPrePowerUp = true;
+				}
+				if (nResult < 0)
+					goto end;
+			}
+
+			tas2559_dev_read(pTAS2559, DevA, TAS2559_VBOOST_CTL_REG, &nValue);
+			dev_dbg(pTAS2559->dev, "VBoost ctrl register after coeff set: 0x%x\n", nValue);
+
+			if (pTAS2559->mbLoadVBoostPrePowerUp) {
+				dev_dbg(pTAS2559->dev, "%s, cfg boost before power on new %d, current=%d\n",
+					__func__, pTAS2559->mnVBoostNewState, pTAS2559->mnVBoostState);
+				nResult = tas2559_set_VBoost(pTAS2559, pTAS2559->mnVBoostNewState, false);
+				if (nResult < 0)
+					goto end;
+				pTAS2559->mbLoadVBoostPrePowerUp = false;
+			}
+
+			tas2559_dev_read(pTAS2559, DevA, TAS2559_VBOOST_CTL_REG, &nValue);
+			dev_dbg(pTAS2559->dev, "VBoost ctrl register after set VBoost: 0x%x\n", nValue);
+
+			tas2559_clearIRQ(pTAS2559);
+			pConfiguration = &(pTAS2559->mpFirmware->mpConfigurations[pTAS2559->mnCurrentConfiguration]);
+			nResult = tas2559_DevStartup(pTAS2559, pConfiguration->mnDevices);
+			if (nResult < 0)
+				goto end;
+
+			if (pProgram->mnAppMode == TAS2559_APP_TUNINGMODE) {
+				nResult = tas2559_checkPLL(pTAS2559);
+				if (nResult < 0) {
+					nResult = tas2559_DevShutdown(pTAS2559, pConfiguration->mnDevices);
+					goto end;
+				}
+			}
+
+			if (pConfiguration->mnDevices & DevB) {
+				nResult = tas2559_load_data(pTAS2559, &(pConfiguration->mData),
+								TAS2559_BLOCK_PST_POWERUP_DEV_B);
+				if (nResult < 0)
+					goto end;
+			}
+
+			nResult = tas2559_DevMute(pTAS2559, pConfiguration->mnDevices, false);
+			if (nResult < 0)
+				goto end;
+
+			pTAS2559->mbPowerUp = true;
+
+			tas2559_get_die_temperature(pTAS2559, &nValue);
+			if(nValue == 0x80000000)
+			{
+				dev_err(pTAS2559->dev, "%s, thermal sensor is wrong, mute output\n", __func__);
+				nResult = tas2559_DevShutdown(pTAS2559, pConfiguration->mnDevices);
+				pTAS2559->mbPowerUp = false;
+				goto end;
+			}
+
+			if (pProgram->mnAppMode == TAS2559_APP_TUNINGMODE) {
+				/* turn on IRQ */
+				tas2559_enableIRQ(pTAS2559, pConfiguration->mnDevices, true);
+				if (!hrtimer_active(&pTAS2559->mtimer)) {
+					pTAS2559->mnDieTvReadCounter = 0;
+					hrtimer_start(&pTAS2559->mtimer,
+						ns_to_ktime((u64)LOW_TEMPERATURE_CHECK_PERIOD * NSEC_PER_MSEC), HRTIMER_MODE_REL);
+				}
+			}
+
+			pTAS2559->mnRestart = 0;
+		}
+	} else {
+		if (pTAS2559->mbPowerUp) {
+			if (hrtimer_active(&pTAS2559->mtimer))
+				hrtimer_cancel(&pTAS2559->mtimer);
+
+			pConfiguration = &(pTAS2559->mpFirmware->mpConfigurations[pTAS2559->mnCurrentConfiguration]);
+
+			if (pProgram->mnAppMode == TAS2559_APP_TUNINGMODE) {
+				/* turn off IRQ */
+				tas2559_enableIRQ(pTAS2559, DevBoth, false);
+			}
+
+			nResult = tas2559_DevShutdown(pTAS2559, pConfiguration->mnDevices);
+			if (nResult < 0)
+				goto end;
+
+			pTAS2559->mbPowerUp = false;
+			pTAS2559->mnRestart = 0;
+		}
+	}
+
+	nResult = 0;
+
+end:
+
+	if (nResult < 0) {
+		if (pTAS2559->mnErrCode & (ERROR_DEVA_I2C_COMM | ERROR_DEVB_I2C_COMM | ERROR_PRAM_CRCCHK | ERROR_YRAM_CRCCHK | ERROR_SAFE_GUARD))
+			failsafe(pTAS2559);
+	}
+
+	dev_dbg(pTAS2559->dev, "%s: exit\n", __func__);
+	return nResult;
+}
+
+int tas2559_set_sampling_rate(struct tas2559_priv *pTAS2559, unsigned int nSamplingRate)
+{
+	int nResult = 0;
+	struct TConfiguration *pConfiguration;
+	unsigned int nConfiguration;
+
+	dev_dbg(pTAS2559->dev, "%s: nSamplingRate = %d [Hz]\n", __func__,
+		nSamplingRate);
+
+	if ((!pTAS2559->mpFirmware->mpPrograms) ||
+	    (!pTAS2559->mpFirmware->mpConfigurations)) {
+		dev_err(pTAS2559->dev, "Firmware not loaded\n");
+		nResult = -EINVAL;
+		goto end;
+	}
+
+	pConfiguration = &(pTAS2559->mpFirmware->mpConfigurations[pTAS2559->mnCurrentConfiguration]);
+
+	if (pConfiguration->mnSamplingRate == nSamplingRate) {
+		dev_info(pTAS2559->dev, "Sampling rate for current configuration matches: %d\n",
+			 nSamplingRate);
+		nResult = 0;
+		goto end;
+	}
+
+	for (nConfiguration = 0;
+	     nConfiguration < pTAS2559->mpFirmware->mnConfigurations;
+	     nConfiguration++) {
+		pConfiguration =
+			&(pTAS2559->mpFirmware->mpConfigurations[nConfiguration]);
+
+		if ((pConfiguration->mnSamplingRate == nSamplingRate)
+		    && (pConfiguration->mnProgram == pTAS2559->mnCurrentProgram)) {
+			dev_info(pTAS2559->dev,
+				 "Found configuration: %s, with compatible sampling rate %d\n",
+				 pConfiguration->mpName, nSamplingRate);
+			nResult = tas2559_load_configuration(pTAS2559, nConfiguration, false);
+			goto end;
+		}
+	}
+
+	dev_err(pTAS2559->dev, "Cannot find a configuration that supports sampling rate: %d\n",
+		nSamplingRate);
+
+end:
+
+	return nResult;
+}
+
+int tas2559_set_config(struct tas2559_priv *pTAS2559, int config)
+{
+	struct TConfiguration *pConfiguration;
+	struct TProgram *pProgram;
+	unsigned int nProgram = pTAS2559->mnCurrentProgram;
+	unsigned int nConfiguration = config;
+	int nResult = 0;
+
+	if ((!pTAS2559->mpFirmware->mpPrograms) ||
+	    (!pTAS2559->mpFirmware->mpConfigurations)) {
+		dev_err(pTAS2559->dev, "Firmware not loaded\n");
+		nResult = -EINVAL;
+		goto end;
+	}
+
+	if (nConfiguration >= pTAS2559->mpFirmware->mnConfigurations) {
+		dev_err(pTAS2559->dev, "Configuration %d doesn't exist\n",
+			nConfiguration);
+		nResult = -EINVAL;
+		goto end;
+	}
+
+	pConfiguration = &(pTAS2559->mpFirmware->mpConfigurations[nConfiguration]);
+	pProgram = &(pTAS2559->mpFirmware->mpPrograms[nProgram]);
+
+	if (nProgram != pConfiguration->mnProgram) {
+		dev_err(pTAS2559->dev,
+			"Configuration %d, %s with Program %d isn't compatible with existing Program %d, %s\n",
+			nConfiguration, pConfiguration->mpName, pConfiguration->mnProgram,
+			nProgram, pProgram->mpName);
+		nResult = -EINVAL;
+		goto end;
+	}
+
+	dev_dbg(pTAS2559->dev, "%s, load new conf %s\n", __func__, pConfiguration->mpName);
+	nResult = tas2559_load_configuration(pTAS2559, nConfiguration, false);
+
+end:
 
 	return nResult;
 }
