@@ -1933,6 +1933,8 @@ static struct of_device_id fts_match_table[] = {
 	{},
 };
 
+MODULE_DEVICE_TABLE(of, fts_match_table);
+
 static struct i2c_driver fts_ts_driver = {
 	.probe = fts_ts_probe,
 	.remove = fts_ts_remove,
