@@ -545,6 +545,15 @@
 		bias-pull-down;
 		drive-strength = <2>;
 	};
+
+	uart9_en_default: uart-mux-pin {
+		mux {
+			pins = "gpio49";
+			function = "gpio";
+			drive-strength = <16>;
+			bias-pull-down;
+		};
+	};
 };
 
 &uart6 {
@@ -580,6 +589,8 @@
 &uart9 {
 	label = "LS-UART1";
 	status = "okay";
+	
+	pinctrl-0 = <&qup_uart9_default &uart9_en_default>;
 };
 
 &usb_1 {
