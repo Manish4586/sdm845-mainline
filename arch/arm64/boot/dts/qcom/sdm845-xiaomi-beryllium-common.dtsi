@@ -36,7 +36,12 @@
 	qcom,msm-id = <321 0x20001>;
 
 	aliases {
+		serial0 = &uart9;
 		hsuart0 = &uart6;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
 	};
 
 	gpio-keys {
@@ -572,6 +577,11 @@
 	vdda-pll-supply = <&vreg_l26a_1p2>;
 };
 
+&uart9 {
+	label = "LS-UART1";
+	status = "okay";
+};
+
 &usb_1 {
 	status = "okay";
 };
@@ -647,6 +657,20 @@
 
 	rx {
 		pins = "gpio48";
+		bias-pull-up;
+	};
+};
+
+&qup_uart9_default {
+	pinconf-tx {
+		pins = "gpio4";
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	pinconf-rx {
+		pins = "gpio5";
+		drive-strength = <2>;
 		bias-pull-up;
 	};
 };
