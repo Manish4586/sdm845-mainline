@@ -418,8 +418,9 @@ static void nt36xxx_report(struct nt36xxx_i2c *ts)
 	}
 
 	for (i = 0; i < TOUCH_MAX_FINGER_NUM; i++) {
-		ppos = 6 * i;
+		ppos = 1 + 6 * i;
 		input_id = point[ppos + 0] >> 3;
+		dev_err(&ts->hw_client->dev, "ppos=%d, input_id=%d", ppos, input_id);
 		if ((input_id == 0) || (input_id > TOUCH_MAX_FINGER_NUM))
 			continue;
 
@@ -428,21 +429,25 @@ static void nt36xxx_report(struct nt36xxx_i2c *ts)
 			obj->x = (point[ppos + 1] << 4) +
 				 (point[ppos + 3] >> 4);
 			obj->y = (point[ppos + 2] << 4) +
-				 (point[ppos + 3] & 0xf);
+				 (point[ppos + 3] & 0x0F);
+			dev_err(&ts->hw_client->dev, "X=%d, Y=%d", obj->x, obj->y);
 			if ((obj->x > ts->prop.max_x) ||
 			    (obj->y > ts->prop.max_y))
 				continue;
 
 			obj->tm = point[ppos + 4];
+			dev_err(&ts->hw_client->dev, "TOUCH MAJOR tm=%d", obj->x, obj->tm);
 			if (obj->tm == 0)
 				obj->tm = 1;
 
 			obj->z = point[ppos + 5];
+			dev_err(&ts->hw_client->dev, "i=%d, pressure_before=%d", i, obj->z);
 			if (i < 2) {
 				obj->z += point[i + 63] << 8;
 				if (obj->z > TOUCH_MAX_PRESSURE)
 					obj->z = TOUCH_MAX_PRESSURE;
 			}
+			dev_err(&ts->hw_client->dev, "i=%d, pressure_after=%d", i, obj->z);
 
 			if (obj->z == 0)
 				obj->z = 1;
