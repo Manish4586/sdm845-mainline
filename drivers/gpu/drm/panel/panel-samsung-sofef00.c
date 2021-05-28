@@ -19,20 +19,7 @@
 #include <drm/drm_modes.h>
 #include <drm/drm_panel.h>
 
-struct sofef00_panel {
-	struct drm_panel panel;
-	struct mipi_dsi_device *dsi;
-	struct regulator *supply;
-	struct gpio_desc *reset_gpio;
-	const struct drm_display_mode *mode;
-	bool prepared;
-};
-
-static inline
-struct sofef00_panel *to_sofef00_panel(struct drm_panel *panel)
-{
-	return container_of(panel, struct sofef00_panel, panel);
-}
+#define MAX_DATA_LEN 16
 
 #define dsi_dcs_write_seq(dsi, seq...) do {				\
 		static const u8 d[] = { seq };				\
@@ -42,8 +29,183 @@ struct sofef00_panel *to_sofef00_panel(struct drm_panel *panel)
 			return ret;					\
 	} while (0)
 
+#define sofef00_gen_cmd(seq...) \
+	{ .data = { seq }, .len = ((int)(sizeof((char[]){ seq })/sizeof(char))) }
+
+struct sofef00_panel_cmd {
+	char data[MAX_DATA_LEN];
+	unsigned long len;
+};
+
+struct sofef00_panel_desc {
+	struct drm_display_mode mode;
+
+	struct sofef00_panel_cmd *on_cmds;
+	unsigned long on_cmds_len;
+	struct sofef00_panel_cmd *prepare_cmds;
+	unsigned long prepare_cmds_len;
+	struct sofef00_panel_cmd *enable_cmds;
+	unsigned long enable_cmds_len;
+	struct sofef00_panel_cmd *off_cmds;
+	unsigned long off_cmds_len;
+};
+
+struct sofef00_panel {
+	struct drm_panel panel;
+	struct mipi_dsi_device *dsi;
+	struct regulator *supply;
+	struct gpio_desc *reset_gpio;
+	struct sofef00_panel_desc *desc;
+	bool prepared;
+};
+
+static const struct sofef00_panel_desc enchilada_panel = {
+	.mode = {
+		.clock = (1080 + 112 + 16 + 36) * (2280 + 36 + 8 + 12) * 60 / 1000,
+		.hdisplay = 1080,
+		.hsync_start = 1080 + 112,
+		.hsync_end = 1080 + 112 + 16,
+		.htotal = 1080 + 112 + 16 + 36,
+		.vdisplay = 2280,
+		.vsync_start = 2280 + 36,
+		.vsync_end = 2280 + 36 + 8,
+		.vtotal = 2280 + 36 + 8 + 12,
+		.width_mm = 68,
+		.height_mm = 145,
+	},
+	.on_cmds = NULL,
+	.on_cmds_len = 0,
+	.prepare_cmds = NULL,
+	.prepare_cmds_len = 0,
+	.enable_cmds = NULL,
+	.enable_cmds_len = 0,
+	.off_cmds = NULL,
+	.off_cmds_len = 0,
+};
+
+static struct sofef00_panel_cmd fajita_on_cmds[] = {
+	sofef00_gen_cmd(0x9F, 0xA5, 0xA5),
+	sofef00_gen_cmd(0x11, 0x00), /* MIPI_DCS_EXIT_SLEEP_MODE */
+	sofef00_gen_cmd(0x9F, 0x5A, 0x5A),
+	/* FD Setting */
+	sofef00_gen_cmd(0xF0, 0x5A, 0x5A),
+	sofef00_gen_cmd(0xB0, 0x01),
+	sofef00_gen_cmd(0xCD, 0x01),
+	sofef00_gen_cmd(0xF0, 0xA5, 0xA5),
+	sofef00_gen_cmd(),
+	/* TE ON */
+	sofef00_gen_cmd(0x9F, 0xA5, 0xA5),
+	sofef00_gen_cmd(0x35, 0x00), /* MIPI_DCS_SET_TEAR_ON */
+	sofef00_gen_cmd(0x9F, 0x5A, 0x5A),
+	/* MIC Setting */
+	sofef00_gen_cmd(0xF0, 0x5A, 0x5A),
+	sofef00_gen_cmd(0xEB, 0x17, 0x41, 0x92, 0x0E, 0x10, 0x82, 0x5A),
+	sofef00_gen_cmd(0xF0, 0xA5, 0xA5),
+	/* CASET/PASET */
+	sofef00_gen_cmd(0x2A, 0x00, 0x00, 0x04, 0x37),
+	sofef00_gen_cmd(0x2B, 0x00, 0x00, 0x09, 0x23),
+	/* TSP H_sync Setting */
+	sofef00_gen_cmd(0xF0, 0x5A, 0x5A),
+	sofef00_gen_cmd(0xB0, 0x09),
+	sofef00_gen_cmd(0xE8, 0x10, 0x30),
+	sofef00_gen_cmd(0xF0, 0xA5, 0xA5),
+	/* Dimming Setting */
+	sofef00_gen_cmd(0xF0, 0x5A, 0x5A),
+	sofef00_gen_cmd(0xB0, 0x07),
+	sofef00_gen_cmd(0xB7, 0x01),
+	sofef00_gen_cmd(0xB0, 0x08),
+	sofef00_gen_cmd(0xB7, 0x12),
+	sofef00_gen_cmd(0xF0, 0xA5, 0xA5),
+	/* ESD improvement Setting */
+	sofef00_gen_cmd(0xFC, 0x5A, 0x5A),
+	sofef00_gen_cmd(0xB0, 0x01),
+	sofef00_gen_cmd(0xE3, 0x88),
+	sofef00_gen_cmd(0xB0, 0x07),
+	sofef00_gen_cmd(0xED, 0x67),
+	sofef00_gen_cmd(0xFC, 0xA5, 0xA5),
+	sofef00_gen_cmd(0xF0, 0x5A, 0x5A),
+	sofef00_gen_cmd(0x53, 0x20), /* MIPI_DCS_WRITE_CONTROL_DISPLAY */
+	sofef00_gen_cmd(0xF0, 0xA5, 0xA5),
+	/* ACL off */
+	sofef00_gen_cmd(0x55, 0x00),
+	/* SEED OFF */
+	// sofef00_gen_cmd(0xF0, 0x5A, 0x5A),
+	// sofef00_gen_cmd(0xB1, 0x00, 0x01),
+	// sofef00_gen_cmd(0xF0, 0xA5, 0xA5),
+	/* SEED TCS OFF */
+	sofef00_gen_cmd(0xF0, 0x5A, 0x5A),
+	sofef00_gen_cmd(0xB3, 0x00, 0xC1),
+	sofef00_gen_cmd(0xF0, 0xA5, 0xA5),
+	/* Display on */
+	sofef00_gen_cmd(0x9F, 0xA5, 0xA5),
+	sofef00_gen_cmd(0x29),
+	sofef00_gen_cmd(0x9F, 0x5A, 0x5A),
+};
+
+static struct sofef00_panel_cmd fajita_off_cmds[] = {
+	sofef00_gen_cmd(0x9F, 0xA5, 0xA5),
+	sofef00_gen_cmd(0x28),
+	sofef00_gen_cmd(0xF0, 0x5A, 0x5A),
+	sofef00_gen_cmd(0xB0, 0x50),
+	sofef00_gen_cmd(0xB9, 0x82),
+	sofef00_gen_cmd(0xF0, 0xA5, 0xA5),
+	sofef00_gen_cmd(0x10),
+	sofef00_gen_cmd(0x9F, 0x5A, 0x5A),
+	sofef00_gen_cmd(0xF0, 0x5A, 0x5A),
+	sofef00_gen_cmd(0xB0, 0x05),
+	sofef00_gen_cmd(0xF4, 0x01),
+	sofef00_gen_cmd(0xF0, 0xA5, 0xA5,),
+};
+
+static const struct sofef00_panel_desc fajita_panel = {
+	.mode = {
+		.clock = (1080 + 72 + 16 + 36) * (2340 + 32 + 4 + 18) * 60 / 1000,
+		.hdisplay = 1080,
+		.hsync_start = 1080 + 72,
+		.hsync_end = 1080 + 72 + 16,
+		.htotal = 1080 + 72 + 16 + 36,
+		.vdisplay = 2340,
+		.vsync_start = 2340 + 32,
+		.vsync_end = 2340 + 32 + 4,
+		.vtotal = 2340 + 32 + 4 + 18,
+		.width_mm = 68,
+		.height_mm = 145,
+	},
+	.on_cmds = fajita_on_cmds,
+	.on_cmds_len = ARRAY_SIZE(fajita_on_cmds),
+	.enable_cmds = NULL,
+	.enable_cmds_len = 0,
+	.prepare_cmds = NULL,
+	.prepare_cmds_len = 0,
+	.off_cmds = fajita_off_cmds,
+	.off_cmds_len = ARRAY_SIZE(fajita_off_cmds),
+};
+
+static inline
+struct sofef00_panel *to_sofef00_panel(struct drm_panel *panel)
+{
+	return container_of(panel, struct sofef00_panel, panel);
+}
+
+static int sofef00_send_cmds(struct sofef00_panel *ctx, struct sofef00_panel_cmd *cmds, size_t len)
+{
+	int ret, i = 0;
+	for (i = 0; i < len; i++)
+	{
+		ret = mipi_dsi_dcs_write_buffer(ctx->dsi, cmds[i].data, cmds[i].len);
+		if (ret < 0) {
+			dev_err(&ctx->dsi->dev, "Failed to write buffer %d, ret=%d", i, ret);
+			return ret;
+		}
+	}
+	return 0;
+}
+
 static void sofef00_panel_reset(struct sofef00_panel *ctx)
 {
+	if (!ctx->reset_gpio)
+		return;
+
 	gpiod_set_value_cansleep(ctx->reset_gpio, 0);
 	usleep_range(5000, 6000);
 	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
@@ -56,38 +218,17 @@ static int sofef00_panel_on(struct sofef00_panel *ctx)
 {
 	struct mipi_dsi_device *dsi = ctx->dsi;
 	struct device *dev = &dsi->dev;
+	struct sofef00_panel_cmd *cmds = ctx->desc->on_cmds;
+	int cmds_len = ctx->desc->on_cmds_len;
 	int ret;
 
 	dsi->mode_flags |= MIPI_DSI_MODE_LPM;
 
-	ret = mipi_dsi_dcs_exit_sleep_mode(dsi);
-	if (ret < 0) {
-		dev_err(dev, "Failed to exit sleep mode: %d\n", ret);
-		return ret;
-	}
-	usleep_range(10000, 11000);
-
-	dsi_dcs_write_seq(dsi, 0xf0, 0x5a, 0x5a);
-
-	ret = mipi_dsi_dcs_set_tear_on(dsi, MIPI_DSI_DCS_TEAR_MODE_VBLANK);
-	if (ret < 0) {
-		dev_err(dev, "Failed to set tear on: %d\n", ret);
-		return ret;
-	}
-
-	dsi_dcs_write_seq(dsi, 0xf0, 0xa5, 0xa5);
-	dsi_dcs_write_seq(dsi, 0xf0, 0x5a, 0x5a);
-	dsi_dcs_write_seq(dsi, 0xb0, 0x07);
-	dsi_dcs_write_seq(dsi, 0xb6, 0x12);
-	dsi_dcs_write_seq(dsi, 0xf0, 0xa5, 0xa5);
-	dsi_dcs_write_seq(dsi, MIPI_DCS_WRITE_CONTROL_DISPLAY, 0x20);
-	dsi_dcs_write_seq(dsi, MIPI_DCS_WRITE_POWER_SAVE, 0x00);
-
-	ret = mipi_dsi_dcs_set_display_on(dsi);
-	if (ret < 0) {
-		dev_err(dev, "Failed to set display on: %d\n", ret);
-		return ret;
-	}
+	ret = sofef00_send_cmds(ctx, cmds, cmds_len);
+	if (ret)
+		dev_err(dev, "Failed to send panel on commands");
+	
+	dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
 
 	return 0;
 }
@@ -96,23 +237,15 @@ static int sofef00_panel_off(struct sofef00_panel *ctx)
 {
 	struct mipi_dsi_device *dsi = ctx->dsi;
 	struct device *dev = &dsi->dev;
+	struct sofef00_panel_cmd *cmds = ctx->desc->off_cmds;
+	int cmds_len = ctx->desc->off_cmds_len;
 	int ret;
 
 	dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
 
-	ret = mipi_dsi_dcs_set_display_off(dsi);
-	if (ret < 0) {
-		dev_err(dev, "Failed to set display off: %d\n", ret);
-		return ret;
-	}
-	msleep(40);
-
-	ret = mipi_dsi_dcs_enter_sleep_mode(dsi);
-	if (ret < 0) {
-		dev_err(dev, "Failed to enter sleep mode: %d\n", ret);
-		return ret;
-	}
-	msleep(160);
+	ret = sofef00_send_cmds(ctx, cmds, cmds_len);
+	if (ret)
+		dev_err(dev, "Failed to send panel off commands");
 
 	return 0;
 }
@@ -120,7 +253,10 @@ static int sofef00_panel_off(struct sofef00_panel *ctx)
 static int sofef00_panel_prepare(struct drm_panel *panel)
 {
 	struct sofef00_panel *ctx = to_sofef00_panel(panel);
-	struct device *dev = &ctx->dsi->dev;
+	struct mipi_dsi_device *dsi = ctx->dsi;
+	struct device *dev = &dsi->dev;
+	struct sofef00_panel_cmd *cmds = ctx->desc->prepare_cmds;
+	int cmds_len = ctx->desc->prepare_cmds_len;
 	int ret;
 
 	if (ctx->prepared)
@@ -145,6 +281,30 @@ static int sofef00_panel_prepare(struct drm_panel *panel)
 	return 0;
 }
 
+static int sofef00_panel_enable(struct drm_panel *panel)
+{
+	struct sofef00_panel *ctx = to_sofef00_panel(panel);
+	struct mipi_dsi_device *dsi = ctx->dsi;
+	struct device *dev = &dsi->dev;
+	struct sofef00_panel_cmd *cmds = ctx->desc->enable_cmds;
+	int cmds_len = ctx->desc->enable_cmds_len;
+	int ret;
+
+	return 0;
+
+	dev_info(dev, "ENABLING PANEL");
+
+	dsi->mode_flags &= ~MIPI_DSI_MODE_LPM;
+
+	ret = sofef00_send_cmds(ctx, cmds, cmds_len);
+	if (ret) {
+		dev_err(dev, "Failed to send panel enable commands");
+		return ret;
+	}
+	
+	return 0;
+}
+
 static int sofef00_panel_unprepare(struct drm_panel *panel)
 {
 	struct sofef00_panel *ctx = to_sofef00_panel(panel);
@@ -164,40 +324,12 @@ static int sofef00_panel_unprepare(struct drm_panel *panel)
 	return 0;
 }
 
-static const struct drm_display_mode enchilada_panel_mode = {
-	.clock = (1080 + 112 + 16 + 36) * (2280 + 36 + 8 + 12) * 60 / 1000,
-	.hdisplay = 1080,
-	.hsync_start = 1080 + 112,
-	.hsync_end = 1080 + 112 + 16,
-	.htotal = 1080 + 112 + 16 + 36,
-	.vdisplay = 2280,
-	.vsync_start = 2280 + 36,
-	.vsync_end = 2280 + 36 + 8,
-	.vtotal = 2280 + 36 + 8 + 12,
-	.width_mm = 68,
-	.height_mm = 145,
-};
-
-static const struct drm_display_mode fajita_panel_mode = {
-	.clock = (1080 + 72 + 16 + 36) * (2340 + 32 + 4 + 18) * 60 / 1000,
-	.hdisplay = 1080,
-	.hsync_start = 1080 + 72,
-	.hsync_end = 1080 + 72 + 16,
-	.htotal = 1080 + 72 + 16 + 36,
-	.vdisplay = 2340,
-	.vsync_start = 2340 + 32,
-	.vsync_end = 2340 + 32 + 4,
-	.vtotal = 2340 + 32 + 4 + 18,
-	.width_mm = 68,
-	.height_mm = 145,
-};
-
 static int sofef00_panel_get_modes(struct drm_panel *panel, struct drm_connector *connector)
 {
 	struct drm_display_mode *mode;
 	struct sofef00_panel *ctx = to_sofef00_panel(panel);
 
-	mode = drm_mode_duplicate(connector->dev, ctx->mode);
+	mode = drm_mode_duplicate(connector->dev, &ctx->desc->mode);
 	if (!mode)
 		return -ENOMEM;
 
@@ -213,6 +345,7 @@ static int sofef00_panel_get_modes(struct drm_panel *panel, struct drm_connector
 
 static const struct drm_panel_funcs sofef00_panel_panel_funcs = {
 	.prepare = sofef00_panel_prepare,
+	.enable = sofef00_panel_enable,
 	.unprepare = sofef00_panel_unprepare,
 	.get_modes = sofef00_panel_get_modes,
 };
@@ -221,9 +354,9 @@ static int sofef00_panel_bl_update_status(struct backlight_device *bl)
 {
 	struct mipi_dsi_device *dsi = bl_get_data(bl);
 	int err;
-	u16 brightness;
+	unsigned short brightness;
 
-	brightness = (u16)backlight_get_brightness(bl);
+	brightness = (unsigned short)backlight_get_brightness(bl);
 	// This panel needs the high and low bytes swapped for the brightness value
 	brightness = __swab16(brightness);
 
@@ -262,10 +395,10 @@ static int sofef00_panel_probe(struct mipi_dsi_device *dsi)
 	if (!ctx)
 		return -ENOMEM;
 
-	ctx->mode = of_device_get_match_data(dev);
+	ctx->desc = of_device_get_match_data(dev);
 
-	if (!ctx->mode) {
-		dev_err(dev, "Missing device mode\n");
+	if (!ctx->desc) {
+		dev_err(dev, "Missing panel description\n");
 		return -ENODEV;
 	}
 
@@ -276,7 +409,7 @@ static int sofef00_panel_probe(struct mipi_dsi_device *dsi)
 		return ret;
 	}
 
-	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
+	ctx->reset_gpio = devm_gpiod_get_optional(dev, "reset", GPIOD_ASIS);
 	if (IS_ERR(ctx->reset_gpio)) {
 		ret = PTR_ERR(ctx->reset_gpio);
 		dev_warn(dev, "Failed to get reset-gpios: %d\n", ret);
@@ -288,6 +421,7 @@ static int sofef00_panel_probe(struct mipi_dsi_device *dsi)
 
 	dsi->lanes = 4;
 	dsi->format = MIPI_DSI_FMT_RGB888;
+	dsi->mode_flags |= MIPI_DSI_CLOCK_NON_CONTINUOUS;
 
 	drm_panel_init(&ctx->panel, dev, &sofef00_panel_panel_funcs,
 		       DRM_MODE_CONNECTOR_DSI);
@@ -296,6 +430,8 @@ static int sofef00_panel_probe(struct mipi_dsi_device *dsi)
 	if (IS_ERR(ctx->panel.backlight))
 		return dev_err_probe(dev, PTR_ERR(ctx->panel.backlight),
 				     "Failed to create backlight\n");
+	
+	//sofef00_panel_off(ctx);
 
 	drm_panel_add(&ctx->panel);
 
@@ -325,11 +461,11 @@ static int sofef00_panel_remove(struct mipi_dsi_device *dsi)
 static const struct of_device_id sofef00_panel_of_match[] = {
 	{ // OnePlus 6 / enchilada
 		.compatible = "samsung,sofef00",
-		.data = &enchilada_panel_mode,
+		.data = &enchilada_panel,
 	},
 	{ // OnePlus 6T / fajita
 		.compatible = "samsung,s6e3fc2x01",
-		.data = &fajita_panel_mode,
+		.data = &fajita_panel,
 	},
 	{ /* sentinel */ }
 };
@@ -339,7 +475,7 @@ static struct mipi_dsi_driver sofef00_panel_driver = {
 	.probe = sofef00_panel_probe,
 	.remove = sofef00_panel_remove,
 	.driver = {
-		.name = "panel-oneplus6",
+		.name = "panel-sofef00",
 		.of_match_table = sofef00_panel_of_match,
 	},
 };
