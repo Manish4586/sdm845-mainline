@@ -424,45 +424,47 @@ static void nt36xxx_report(struct nt36xxx_i2c *ts)
 		if ((input_id == 0) || (input_id > TOUCH_MAX_FINGER_NUM))
 			continue;
 
-		if (((point[ppos] & 0x07) == 0x01) ||
-		    ((point[ppos] & 0x07) == 0x02)) {
-			obj->x = (point[ppos + 1] << 4) +
-				 (point[ppos + 3] >> 4);
-			obj->y = (point[ppos + 2] << 4) +
-				 (point[ppos + 3] & 0x0F);
-			dev_err(&ts->hw_client->dev, "X=%d, Y=%d", obj->x, obj->y);
-			if ((obj->x > ts->prop.max_x) ||
-			    (obj->y > ts->prop.max_y))
-				continue;
+		dev_err(&ts->hw_client->dev, "finger_down_moving=%x", point[ppos] & 0x07);
 
-			obj->tm = point[ppos + 4];
-			dev_err(&ts->hw_client->dev, "TOUCH MAJOR tm=%d", obj->x, obj->tm);
-			if (obj->tm == 0)
-				obj->tm = 1;
+		// if (((point[ppos] & 0x07) == 0x01) ||
+		//     ((point[ppos] & 0x07) == 0x02)) {
+		obj->x = (point[ppos + 1] << 4) +
+				(point[ppos + 3] >> 4);
+		obj->y = (point[ppos + 2] << 4) +
+				(point[ppos + 3] & 0x0F);
+		dev_err(&ts->hw_client->dev, "X=%d, Y=%d", obj->x, obj->y);
+		if ((obj->x > ts->prop.max_x) ||
+			(obj->y > ts->prop.max_y))
+			continue;
 
-			obj->z = point[ppos + 5];
-			dev_err(&ts->hw_client->dev, "i=%d, pressure_before=%d", i, obj->z);
-			if (i < 2) {
-				obj->z += point[i + 63] << 8;
-				if (obj->z > TOUCH_MAX_PRESSURE)
-					obj->z = TOUCH_MAX_PRESSURE;
-			}
-			dev_err(&ts->hw_client->dev, "i=%d, pressure_after=%d", i, obj->z);
+		obj->tm = point[ppos + 4];
+		dev_err(&ts->hw_client->dev, "TOUCH MAJOR tm=%d", obj->x, obj->tm);
+		if (obj->tm == 0)
+			obj->tm = 1;
 
-			if (obj->z == 0)
-				obj->z = 1;
-
-			input_mt_slot(input, input_id - 1);
-			input_mt_report_slot_state(input,
-						   MT_TOOL_FINGER, true);
-			touchscreen_report_pos(input, &ts->prop, obj->x,
-					       obj->y, true);
-
-			input_report_abs(input, ABS_MT_TOUCH_MAJOR, obj->tm);
-			input_report_abs(input, ABS_MT_PRESSURE, obj->z);
-
-			finger_cnt++;
+		obj->z = point[ppos + 5];
+		dev_err(&ts->hw_client->dev, "i=%d, pressure_before=%d", i, obj->z);
+		if (i < 2) {
+			obj->z += point[i + 63] << 8;
+			if (obj->z > TOUCH_MAX_PRESSURE)
+				obj->z = TOUCH_MAX_PRESSURE;
 		}
+		dev_err(&ts->hw_client->dev, "i=%d, pressure_after=%d", i, obj->z);
+
+		if (obj->z == 0)
+			obj->z = 1;
+
+		input_mt_slot(input, input_id - 1);
+		input_mt_report_slot_state(input,
+						MT_TOOL_FINGER, true);
+		touchscreen_report_pos(input, &ts->prop, obj->x,
+						obj->y, true);
+
+		input_report_abs(input, ABS_MT_TOUCH_MAJOR, obj->tm);
+		input_report_abs(input, ABS_MT_PRESSURE, obj->z);
+
+		finger_cnt++;
+		// }
 	}
 	input_mt_sync_frame(input);
 	input_sync(input);
