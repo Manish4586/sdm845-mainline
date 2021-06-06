@@ -1002,13 +1002,6 @@ free_vrp:
 	return err;
 }
 
-static int rpmsg_remove_device(struct device *dev, void *data)
-{
-	device_unregister(dev);
-
-	return 0;
-}
-
 static void rpmsg_remove(struct virtio_device *vdev)
 {
 	struct virtproc_info *vrp = vdev->priv;
@@ -1016,11 +1009,7 @@ static void rpmsg_remove(struct virtio_device *vdev)
 	int ret;
 
 	vdev->config->reset(vdev);
-
-	ret = device_for_each_child(&vdev->dev, NULL, rpmsg_remove_device);
-	if (ret)
-		dev_warn(&vdev->dev, "can't remove rpmsg device: %d\n", ret);
-
+	rpmsg_unregister_devices(&vdev->dev);
 	idr_destroy(&vrp->endpoints);
 
 	vdev->config->del_vqs(vrp->vdev);
