@@ -327,37 +327,6 @@ int rpmsg_trysend_offchannel(struct rpmsg_endpoint *ept, u32 src, u32 dst,
 }
 EXPORT_SYMBOL(rpmsg_trysend_offchannel);
 
-/*
- * match a rpmsg channel with a channel info struct.
- * this is used to make sure we're not creating rpmsg devices for channels
- * that already exist.
- */
-static int rpmsg_device_match(struct device *dev, void *data)
-{
-	struct rpmsg_channel_info *chinfo = data;
-	struct rpmsg_device *rpdev = to_rpmsg_device(dev);
-
-	if (chinfo->src != RPMSG_ADDR_ANY && chinfo->src != rpdev->src)
-		return 0;
-
-	if (chinfo->dst != RPMSG_ADDR_ANY && chinfo->dst != rpdev->dst)
-		return 0;
-
-	if (strncmp(chinfo->name, rpdev->id.name, RPMSG_NAME_SIZE))
-		return 0;
-
-	/* found a match ! */
-	return 1;
-}
-
-struct device *rpmsg_find_device(struct device *parent,
-				 struct rpmsg_channel_info *chinfo)
-{
-	return device_find_child(parent, chinfo, rpmsg_device_match);
-
-}
-EXPORT_SYMBOL(rpmsg_find_device);
-
 /* sysfs show configuration fields */
 #define rpmsg_show_attr(field, path, format_string)			\
 static ssize_t								\
@@ -556,6 +525,36 @@ static struct bus_type rpmsg_bus = {
 	.probe		= rpmsg_dev_probe,
 	.remove		= rpmsg_dev_remove,
 };
+
+/*
+ * match a rpmsg channel with a channel info struct.
+ * this is used to make sure we're not creating rpmsg devices for channels
+ * that already exist.
+ */
+static int rpmsg_device_match(struct device *dev, void *data)
+{
+	struct rpmsg_channel_info *chinfo = data;
+	struct rpmsg_device *rpdev = to_rpmsg_device(dev);
+
+	if (chinfo->src != RPMSG_ADDR_ANY && chinfo->src != rpdev->src)
+		return 0;
+
+	if (chinfo->dst != RPMSG_ADDR_ANY && chinfo->dst != rpdev->dst)
+		return 0;
+
+	if (strncmp(chinfo->name, rpdev->id.name, RPMSG_NAME_SIZE))
+		return 0;
+
+	/* found a match ! */
+	return 1;
+}
+
+struct device *rpmsg_find_device(struct device *parent,
+				 struct rpmsg_channel_info *chinfo)
+{
+	return device_find_child(parent, chinfo, rpmsg_device_match);
+}
+EXPORT_SYMBOL(rpmsg_find_device);
 
 int rpmsg_register_device(struct rpmsg_device *rpdev)
 {
