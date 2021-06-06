@@ -536,6 +536,9 @@ static int rpmsg_device_match(struct device *dev, void *data)
 	struct rpmsg_channel_info *chinfo = data;
 	struct rpmsg_device *rpdev = to_rpmsg_device(dev);
 
+	if (dev->bus != &rpmsg_bus)
+		return 0;
+
 	if (chinfo->src != RPMSG_ADDR_ANY && chinfo->src != rpdev->src)
 		return 0;
 
@@ -599,6 +602,9 @@ EXPORT_SYMBOL(rpmsg_unregister_device);
 
 static int rpmsg_unregister_child(struct device *dev, void *data)
 {
+	if (dev->bus != &rpmsg_bus)
+		return 0;
+
 	device_unregister(dev);
 	return 0;
 }
