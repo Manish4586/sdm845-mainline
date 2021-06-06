@@ -1518,29 +1518,16 @@ unregister_dev:
 }
 EXPORT_SYMBOL(qcom_smd_register_edge);
 
-static int qcom_smd_remove_device(struct device *dev, void *data)
-{
-	device_unregister(dev);
-
-	return 0;
-}
-
 /**
  * qcom_smd_unregister_edge() - release an edge and its children
  * @edge:      edge reference acquired from qcom_smd_register_edge
  */
 int qcom_smd_unregister_edge(struct qcom_smd_edge *edge)
 {
-	int ret;
-
 	disable_irq(edge->irq);
 	cancel_work_sync(&edge->scan_work);
 	cancel_work_sync(&edge->state_work);
-
-	ret = device_for_each_child(&edge->dev, NULL, qcom_smd_remove_device);
-	if (ret)
-		dev_warn(&edge->dev, "can't remove smd device: %d\n", ret);
-
+	rpmsg_unregister_devices(&edge->dev);
 	mbox_free_channel(edge->mbox_chan);
 	device_unregister(&edge->dev);
 

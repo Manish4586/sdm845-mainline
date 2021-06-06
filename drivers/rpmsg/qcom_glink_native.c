@@ -1718,25 +1718,14 @@ struct qcom_glink *qcom_glink_native_probe(struct device *dev,
 }
 EXPORT_SYMBOL_GPL(qcom_glink_native_probe);
 
-static int qcom_glink_remove_device(struct device *dev, void *data)
-{
-	device_unregister(dev);
-
-	return 0;
-}
-
 void qcom_glink_native_remove(struct qcom_glink *glink)
 {
 	struct glink_channel *channel;
 	int cid;
-	int ret;
 
 	disable_irq(glink->irq);
 	qcom_glink_cancel_rx_work(glink);
-
-	ret = device_for_each_child(glink->dev, NULL, qcom_glink_remove_device);
-	if (ret)
-		dev_warn(glink->dev, "Can't remove GLINK devices: %d\n", ret);
+	rpmsg_unregister_devices(glink->dev);
 
 	/* Release any defunct local channels, waiting for close-ack */
 	idr_for_each_entry(&glink->lcids, channel, cid)

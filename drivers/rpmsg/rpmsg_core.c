@@ -597,6 +597,29 @@ int rpmsg_unregister_device(struct device *parent,
 }
 EXPORT_SYMBOL(rpmsg_unregister_device);
 
+static int rpmsg_unregister_child(struct device *dev, void *data)
+{
+	device_unregister(dev);
+	return 0;
+}
+
+/**
+ * rpmsg_unregister_devices() - unregister all RPMSG children devices
+ * @parent: the parent device
+ *
+ * This function iterates over all children devices of @parent and unregisters
+ * them as if rpmsg_unregister_device() was called for each of them.
+ */
+void rpmsg_unregister_devices(struct device *parent)
+{
+	int ret;
+
+	ret = device_for_each_child(parent, NULL, rpmsg_unregister_child);
+	if (ret)
+		dev_warn(parent, "can't unregister rpmsg child: %d\n", ret);
+}
+EXPORT_SYMBOL(rpmsg_unregister_devices);
+
 /**
  * __register_rpmsg_driver() - register an rpmsg driver with the rpmsg bus
  * @rpdrv: pointer to a struct rpmsg_driver
