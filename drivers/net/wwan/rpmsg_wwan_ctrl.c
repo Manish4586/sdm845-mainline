@@ -31,26 +31,13 @@ static int rpmsg_wwan_ctrl_callback(struct rpmsg_device *rpdev,
 static int rpmsg_wwan_ctrl_start(struct wwan_port *port)
 {
 	struct rpmsg_wwan_dev *rpwwan = wwan_port_get_drvdata(port);
-	struct rpmsg_channel_info chinfo = {
-		.src = rpwwan->rpdev->src,
-		.dst = RPMSG_ADDR_ANY,
-	};
 
-	strncpy(chinfo.name, rpwwan->rpdev->id.name, RPMSG_NAME_SIZE);
-	rpwwan->ept = rpmsg_create_ept(rpwwan->rpdev, rpmsg_wwan_ctrl_callback,
-				       rpwwan, chinfo);
-	if (!rpwwan->ept)
-		return -EREMOTEIO;
-
+	rpwwan->ept = rpwwan->rpdev->ept;
 	return 0;
 }
 
 static void rpmsg_wwan_ctrl_stop(struct wwan_port *port)
 {
-	struct rpmsg_wwan_dev *rpwwan = wwan_port_get_drvdata(port);
-
-	rpmsg_destroy_ept(rpwwan->ept);
-	rpwwan->ept = NULL;
 }
 
 static int rpmsg_wwan_ctrl_tx(struct wwan_port *port, struct sk_buff *skb,
@@ -129,6 +116,7 @@ MODULE_DEVICE_TABLE(rpmsg, rpmsg_wwan_ctrl_id_table);
 static struct rpmsg_driver rpmsg_wwan_ctrl_driver = {
 	.drv.name = "rpmsg_wwan_ctrl",
 	.id_table = rpmsg_wwan_ctrl_id_table,
+	.callback = rpmsg_wwan_ctrl_callback,
 	.probe = rpmsg_wwan_ctrl_probe,
 	.remove = rpmsg_wwan_ctrl_remove,
 };
