@@ -107,7 +107,7 @@
 #define IMX363_MODE_STREAMING		0x01
 
 /* Chip ID */
-/*???????? TODO*/ 
+#define IMX363_REG_CHIP_ID		0x0016
 #define IMX363_CHIP_ID			0x0363
 
 /* Number of CSI lines connected */
@@ -403,54 +403,58 @@ static inline struct imx363 *to_imx363(struct v4l2_subdev *_sd)
 }
 
 /* Read registers up to 2 at a time */
-// static int imx363_read_reg(struct imx363 *imx363, u16 reg, u32 len, u32 *val)
-// {
-// 	struct i2c_client *client = v4l2_get_subdevdata(&imx363->sd);
-// 	struct i2c_msg msgs[2];
-// 	u8 addr_buf[2] = { reg >> 8, reg & 0xff };
-// 	u8 data_buf[4] = { 0, };
-// 	int ret;
+static int imx363_read_reg(struct imx363 *imx363, u16 reg, u32 len, u32 *val)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(&imx363->sd);
+	struct i2c_msg msgs[2];
+	u8 addr_buf[2] = { reg >> 8, reg & 0xff };
+	u8 data_buf[4] = { 0, };
+	int ret;
 
-// 	if (len > 4)
-// 		return -EINVAL;
+	if (len > 4){
+        dev_err(&client->dev, "len > 4\n");
+        return -EINVAL;
+    }
 
-// 	/* Write register address */
-// 	msgs[0].addr = client->addr;
-// 	msgs[0].flags = 0;
-// 	msgs[0].len = ARRAY_SIZE(addr_buf);
-// 	msgs[0].buf = addr_buf;
+	/* Write register address */
+	msgs[0].addr = client->addr;
+	msgs[0].flags = 0;
+	msgs[0].len = ARRAY_SIZE(addr_buf);
+	msgs[0].buf = addr_buf;
 
-// 	/* Read data from register */
-// 	msgs[1].addr = client->addr;
-// 	msgs[1].flags = I2C_M_RD;
-// 	msgs[1].len = len;
-// 	msgs[1].buf = &data_buf[4 - len];
+	/* Read data from register */
+	msgs[1].addr = client->addr;
+	msgs[1].flags = I2C_M_RD;
+	msgs[1].len = len;
+	msgs[1].buf = &data_buf[4 - len];
 
-// 	ret = i2c_transfer(client->adapter, msgs, ARRAY_SIZE(msgs));
-// 	if (ret != ARRAY_SIZE(msgs))
-// 		return -EIO;
+	ret = i2c_transfer(client->adapter, msgs, ARRAY_SIZE(msgs));
+	if (ret != ARRAY_SIZE(msgs)){
+        dev_err(&client->dev, "ret != ARRAY_SIZE(msgs)\n");
+        return -EIO;
+    }
 
-// 	*val = get_unaligned_be32(data_buf);
+	*val = get_unaligned_be32(data_buf);
 
-// 	return 0;
-// }
+	return 0;
+}
 
 // /* Write registers up to 2 at a time */
-// static int imx363_write_reg(struct imx363 *imx363, u16 reg, u32 len, u32 val)
-// {
-// 	struct i2c_client *client = v4l2_get_subdevdata(&imx363->sd);
-// 	u8 buf[6];
+static int imx363_write_reg(struct imx363 *imx363, u16 reg, u32 len, u32 val)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(&imx363->sd);
+	u8 buf[6];
 
-// 	if (len > 4)
-// 		return -EINVAL;
+	if (len > 4)
+		return -EINVAL;
 
-// 	put_unaligned_be16(reg, buf);
-// 	put_unaligned_be32(val << (8 * (4 - len)), buf + 2);
-// 	if (i2c_master_send(client, buf, len + 2) != len + 2)
-// 		return -EIO;
+	put_unaligned_be16(reg, buf);
+	put_unaligned_be32(val << (8 * (4 - len)), buf + 2);
+	if (i2c_master_send(client, buf, len + 2) != len + 2)
+		return -EIO;
 
-// 	return 0;
-// }
+	return 0;
+}
 
 // /* Write a list of registers */
 // static int imx363_write_regs(struct imx363 *imx363,
@@ -1036,6 +1040,8 @@ static int imx363_identify_module(struct imx363 *imx363)
 		return -EIO;
 	}
 
+    dev_err(&client->dev, "chip id freaking matched! : %x\n", val);
+
 	return 0;
 }
 
@@ -1278,7 +1284,7 @@ static int imx363_probe(struct i2c_client *client)
 	// if (ret)
 	// 	goto error_power_off;
 
-    dev_info(dev, "%s: probed successfully\n");
+    dev_info(dev, "probed successfully\n");
 	// /* Set default mode to max resolution */
 	// imx363->mode = &supported_modes[0];
 
