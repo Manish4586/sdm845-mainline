@@ -22,19 +22,22 @@
 #define IMX363_REG_VALUE_16BIT		2
 
 /* External clock frequency is 24.0M */
-#define IMX363_XCLK_FREQ		24000000
+#define IMX363_XCLK_FREQ		24000000 //------------------------correct
 
 /* Half of per-lane speed in Mbps (DDR) */
 #define IMX363_DEFAULT_LINK_FREQ	456000000
 
 /* currently only 2-lane operation is supported */
-#define IMX363_NUM_LANES		2
+#define IMX363_NUM_LANES		4 //------------------------correct
+
+#define IMX363_VTS_MAX			0xffff
+#define IMX363_VTS_15FPS		0x0dc6
 
 /* no clue why this is 10, but it is */
 #define IMX363_BITS_PER_SAMPLE		10
 
-/* Pixel rate is fixed at 182.4M for all the modes */
-#define IMX363_PIXEL_RATE		(IMX363_DEFAULT_LINK_FREQ * 2 * IMX363_NUM_LANES / IMX363_BITS_PER_SAMPLE)
+/* Pixel rate is fixed at 364.8M for all the modes */
+#define IMX363_PIXEL_RATE		364800000 // (IMX363_DEFAULT_LINK_FREQ * 2 * IMX363_NUM_LANES / IMX363_BITS_PER_SAMPLE)
 
 /* Register map */
 
@@ -51,7 +54,7 @@
 #define IMX363_REG_HDR_MODE				0x0220
 #define IMX363_REG_HDR_RESO_REDU_HHDR_RESO_REDU_V	0x0221
 
-#define IMX363_REG_FRM_LENGTH_LINES			0x0340 // 16 bits
+#define IMX363_REG_FRM_LENGTH_LINES			0x0340 // 16 bits //present in downstrea, gets called many times, but always 0xC
 #define IMX363_REG_LINE_LENGTH_PCK			0x0342 // 16 bits
 
 #define IMX363_REG_X_EVN_INC				0x0381
@@ -220,13 +223,13 @@ struct imx363_mode {
 };
 
 static const struct imx363_reg setup_regs[] = {
-	{IMX363_REG_MODE_SELECT, IMX363_REG_VALUE_08BIT, IMX363_MODE_STANDBY}, // standby
+	{IMX363_REG_MODE_SELECT, IMX363_REG_VALUE_08BIT, IMX363_MODE_STANDBY}, // standby //------------------------correct
 
-	{IMX363_REG_CSI_LANE_MODE, IMX363_REG_VALUE_08BIT, IMX363_CSI_LANE_NUM_4},
+	{IMX363_REG_CSI_LANE_MODE, IMX363_REG_VALUE_08BIT, IMX363_CSI_LANE_NUM_4}, //------------------------correct
 
-	{IMX363_REG_DPHY_CTRL, IMX363_REG_VALUE_08BIT, IMX363_DPHY_CTRL_AUTO},
+	{IMX363_REG_DPHY_CTRL, IMX363_REG_VALUE_08BIT, IMX363_DPHY_CTRL_AUTO}, //------------NA
 
-	{IMX363_REG_EXCK_FREQ_H, IMX363_REG_VALUE_16BIT, 0x1800}, // 24.00 Mhz = 18.00h
+	{IMX363_REG_EXCK_FREQ_H, IMX363_REG_VALUE_16BIT, 0x1800}, // 24.00 Mhz = 18.00h //------------------------correct
 
 //	{IMX363_REG_LINE_LENGTH_PCK, IMX363_REG_VALUE_16BIT, 0x2200},
 
@@ -238,37 +241,51 @@ static const struct imx363_reg setup_regs[] = {
 
 	// {IMX363_REG_IVTPXCK_DIV, IMX363_REG_VALUE_8BIT, 3}
 	// {IMX363_REG_IVTSYCK_DIV, IMX363_REG_VALUE_8BIT, 2}
-	{IMX363_REG_PREPLLCK_IVT_DIV, IMX363_REG_VALUE_08BIT, 4},
-	{IMX363_REG_PLL_IVT_MPY, IMX363_REG_VALUE_16BIT, 210},
-	{IMX363_REG_IOPPXCK_DIV, IMX363_REG_VALUE_08BIT, 10},
-	{IMX363_REG_IOPSYCK_DIV, IMX363_REG_VALUE_08BIT, 1},
-	{IMX363_REG_PREPLLCK_IOP_DIV, IMX363_REG_VALUE_08BIT, 4},
-	{IMX363_REG_PLL_IOP_MPY, IMX363_REG_VALUE_16BIT, 200},
-	{IMX363_REG_PLL_MULT_DRIV, IMX363_REG_VALUE_08BIT, 1}, //true
+	{IMX363_REG_PREPLLCK_IVT_DIV, IMX363_REG_VALUE_08BIT, 4}, //---------NA
+	{IMX363_REG_PLL_IVT_MPY, IMX363_REG_VALUE_16BIT, 210}, //---------NA
+	{IMX363_REG_IOPPXCK_DIV, IMX363_REG_VALUE_08BIT, 10}, //---------NA
+	{IMX363_REG_IOPSYCK_DIV, IMX363_REG_VALUE_08BIT, 1}, //---------NA
+	{IMX363_REG_PREPLLCK_IOP_DIV, IMX363_REG_VALUE_08BIT, 4}, //------------------------correct
+	{IMX363_REG_PLL_IOP_MPY, IMX363_REG_VALUE_16BIT, 0}, //------------------------correct
+	{IMX363_REG_PLL_MULT_DRIV, IMX363_REG_VALUE_08BIT, 1}, //true //------------------------correct
 
 	// magic default value updates - TODO: is this needed?
-	{0x31A3, IMX363_REG_VALUE_08BIT, 0x00},
-	{0x64D4, IMX363_REG_VALUE_08BIT, 0x01},
-	{0x64D5, IMX363_REG_VALUE_08BIT, 0xAA},
-	{0x64D6, IMX363_REG_VALUE_08BIT, 0x01},
-	{0x64D7, IMX363_REG_VALUE_08BIT, 0xA9},
-	{0x64D8, IMX363_REG_VALUE_08BIT, 0x01},
-	{0x64D9, IMX363_REG_VALUE_08BIT, 0xA5},
-	{0x64DA, IMX363_REG_VALUE_08BIT, 0x01},
-	{0x64DB, IMX363_REG_VALUE_08BIT, 0xA1},
-	{0x720A, IMX363_REG_VALUE_08BIT, 0x24},
-	{0x720B, IMX363_REG_VALUE_08BIT, 0x89},
-	{0x720C, IMX363_REG_VALUE_08BIT, 0x85},
-	{0x720D, IMX363_REG_VALUE_08BIT, 0xA1},
-	{0x720E, IMX363_REG_VALUE_08BIT, 0x6E},
-	{0x729C, IMX363_REG_VALUE_08BIT, 0x59},
-	{0x817C, IMX363_REG_VALUE_08BIT, 0xFF},
-	{0x817D, IMX363_REG_VALUE_08BIT, 0x80},
-	{0x9348, IMX363_REG_VALUE_08BIT, 0x96},
-	{0x934B, IMX363_REG_VALUE_08BIT, 0x8C},
-	{0x934C, IMX363_REG_VALUE_08BIT, 0x82},
-	{0x9353, IMX363_REG_VALUE_08BIT, 0xAA},
-	{0x9354, IMX363_REG_VALUE_08BIT, 0xAA},
+	{0x31A3, IMX363_REG_VALUE_08BIT, 0x00}, //------------------------correct
+	{0x64D4, IMX363_REG_VALUE_08BIT, 0x01}, //------------------------correct
+	{0x64D5, IMX363_REG_VALUE_08BIT, 0xAA}, //---------NA
+	{0x64D6, IMX363_REG_VALUE_08BIT, 0x01}, //------------------------correct
+	{0x64D7, IMX363_REG_VALUE_08BIT, 0xA9}, //------------------------correct
+	{0x64D8, IMX363_REG_VALUE_08BIT, 0x01}, //---------NA
+	{0x64D9, IMX363_REG_VALUE_08BIT, 0xA5}, //------------------------correct
+	{0x64DA, IMX363_REG_VALUE_08BIT, 0x01}, //------------------------correct
+	{0x64DB, IMX363_REG_VALUE_08BIT, 0xA1}, //---------NA
+	{0x720A, IMX363_REG_VALUE_08BIT, 0x24}, //------------------------correct
+	{0x720B, IMX363_REG_VALUE_08BIT, 0x89}, //---------NA
+	{0x720C, IMX363_REG_VALUE_08BIT, 0x85}, //------------------------correct
+	{0x720D, IMX363_REG_VALUE_08BIT, 0xA1}, //---------NA
+	{0x720E, IMX363_REG_VALUE_08BIT, 0x6E}, //------------------------correct
+	{0x729C, IMX363_REG_VALUE_08BIT, 0x59}, //------------------------correct
+	{0x817C, IMX363_REG_VALUE_08BIT, 0xFF}, //------------------------correct
+	{0x817D, IMX363_REG_VALUE_08BIT, 0x80}, //------------------------correct
+	{0x9348, IMX363_REG_VALUE_08BIT, 0x96}, //---------NA
+	{0x934B, IMX363_REG_VALUE_08BIT, 0x8C}, //------------------------correct
+	{0x934C, IMX363_REG_VALUE_08BIT, 0x82}, //------------------------correct
+	{0x9353, IMX363_REG_VALUE_08BIT, 0xAA}, //------------------------correct
+	{0x9354, IMX363_REG_VALUE_08BIT, 0xAA}, //---------NA
+
+	{IMX363_REG_CSI_DT_FMT_L, IMX363_REG_VALUE_08BIT, 0xA0}, //------------------------correct
+	{IMX363_REG_ST_COARSE_INTEG_TIME, IMX363_REG_VALUE_08BIT, 0x01}, //------------------------present in downstream, 1 time
+	{0x30F, IMX363_REG_VALUE_08BIT, 0xDD}, //------------------------dont know, present in downstream, 1 time
+	{0x225, IMX363_REG_VALUE_08BIT, 0xF4}, //------------------------dont know, present in downstream, 1 time
+	{0x227, IMX363_REG_VALUE_08BIT, 0x00}, //------------------------dont know, present in downstream, 1 time
+	{0x2, IMX363_REG_VALUE_08BIT, 0x00}, //------------------------dont know, present in downstream, 1 time
+	{0x341, IMX363_REG_VALUE_08BIT, 0x62}, //------------------------dont know, present in downstream, many times but always 0x62
+	{0x3008, IMX363_REG_VALUE_08BIT, 0x00}, //------------------------dont know, present in downstream, many times but always 0x00
+	{0x0, IMX363_REG_VALUE_16BIT, 0x5c40}, //------------------------dont know, present in downstream, 1 time
+	// 0x203 - dont know, present in downstream, value keeps changing when streaming
+	// 0x205 - dont know, present in downstream, value keeps changing when streaming
+	// 0x104 - dont know, present in downstream, value keeps changing btw 0 and 1 when streaming
+	// 0x20F - dont know, present in downstream, value mostly 0 but in btw changed to 0x14,0x10,0x4 once and then back to 0
 };
 
 static const struct imx363_reg_list setup_reg_list = {
@@ -283,6 +300,10 @@ static const struct imx363_reg mode_4032x3024_regs[] = {
 static const struct imx363_reg raw10_framefmt_regs[] = {
 	// {IMX363_REG_CSI_DATA_FORMAT_A_HIG, IMX363_REG_VALUE_16BIT, IMX363_CSI_DATA_FORMAT_RAW10},
 	// {IMX363_REG_OPPXCK_DIV, IMX363_REG_VALUE_08BIT, 0x0a},
+};
+
+static const s64 imx363_link_freq_menu[] = {
+	IMX363_DEFAULT_LINK_FREQ,
 };
 
 /* regulator supplies */
@@ -355,7 +376,7 @@ static const struct imx363_mode supported_modes[] = {
 			.width = 4032,
 			.height = 3024
 		},
-		// .vts_def = IMX363_VTS_15FPS,
+		.vts_def = IMX363_VTS_15FPS,
 		.reg_list = {
 			.num_of_regs = ARRAY_SIZE(mode_4032x3024_regs),
 			.regs = mode_4032x3024_regs,
@@ -377,6 +398,7 @@ struct imx363 {
 
 	struct v4l2_ctrl_handler ctrl_handler;
 	/* V4L2 Controls */
+	struct v4l2_ctrl *link_freq;
 	struct v4l2_ctrl *pixel_rate;
 	struct v4l2_ctrl *exposure;
 	struct v4l2_ctrl *vflip;
@@ -456,473 +478,473 @@ static int imx363_write_reg(struct imx363 *imx363, u16 reg, u32 len, u32 val)
 	return 0;
 }
 
-// /* Write a list of registers */
-// static int imx363_write_regs(struct imx363 *imx363,
-// 			     const struct imx363_reg *regs, u32 len)
-// {
-// 	struct i2c_client *client = v4l2_get_subdevdata(&imx363->sd);
-// 	unsigned int i;
-// 	int ret;
-
-// 	for (i = 0; i < len; i++) {
-// 		ret = imx363_write_reg(imx363, regs[i].address, regs[i].val_len, regs[i].val);
-// 		if (ret) {
-// 			dev_err_ratelimited(&client->dev,
-// 					    "Failed to write reg 0x%4.4x. error = %d\n",
-// 					    regs[i].address, ret);
-
-// 			return ret;
-// 		}
-// 	}
-
-// 	return 0;
-// }
-
-// /* Get bayer order based on flip setting. */
-// static u32 imx363_get_format_code(struct imx363 *imx363, u32 code)
-// {
-// 	unsigned int i;
-
-// 	lockdep_assert_held(&imx363->mutex);
-
-// 	for (i = 0; i < ARRAY_SIZE(codes); i++)
-// 		if (codes[i] == code)
-// 			break;
-
-// 	if (i >= ARRAY_SIZE(codes))
-// 		i = 0;
-
-// 	i = (i & ~3) | (imx363->vflip->val ? 2 : 0) |
-// 	    (imx363->hflip->val ? 1 : 0);
-
-// 	return codes[i];
-// }
-
-// static void imx363_set_default_format(struct imx363 *imx363)
-// {
-// 	struct v4l2_mbus_framefmt *fmt;
-
-// 	fmt = &imx363->fmt;
-// 	fmt->code = MEDIA_BUS_FMT_SRGGB10_1X10;
-// 	fmt->colorspace = V4L2_COLORSPACE_SRGB;
-// 	fmt->ycbcr_enc = V4L2_MAP_YCBCR_ENC_DEFAULT(fmt->colorspace);
-// 	fmt->quantization = V4L2_MAP_QUANTIZATION_DEFAULT(true,
-// 							  fmt->colorspace,
-// 							  fmt->ycbcr_enc);
-// 	fmt->xfer_func = V4L2_MAP_XFER_FUNC_DEFAULT(fmt->colorspace);
-// 	fmt->width = supported_modes[0].width;
-// 	fmt->height = supported_modes[0].height;
-// 	fmt->field = V4L2_FIELD_NONE;
-// }
-
-// static int imx363_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
-// {
-// 	struct imx363 *imx363 = to_imx363(sd);
-// 	struct v4l2_mbus_framefmt *try_fmt =
-// 		v4l2_subdev_get_try_format(sd, fh->pad, 0);
-// 	struct v4l2_rect *try_crop;
-
-// 	mutex_lock(&imx363->mutex);
-
-// 	/* Initialize try_fmt */
-// 	try_fmt->width = supported_modes[0].width;
-// 	try_fmt->height = supported_modes[0].height;
-// 	try_fmt->code = imx363_get_format_code(imx363,
-// 					       MEDIA_BUS_FMT_SRGGB10_1X10);
-// 	try_fmt->field = V4L2_FIELD_NONE;
-
-// 	/* Initialize try_crop rectangle. */
-// 	try_crop = v4l2_subdev_get_try_crop(sd, fh->pad, 0);
-// 	try_crop->top = IMX363_PIXEL_ARRAY_TOP;
-// 	try_crop->left = IMX363_PIXEL_ARRAY_LEFT;
-// 	try_crop->width = IMX363_PIXEL_ARRAY_WIDTH;
-// 	try_crop->height = IMX363_PIXEL_ARRAY_HEIGHT;
-
-// 	mutex_unlock(&imx363->mutex);
-
-// 	return 0;
-// }
-
-// static int imx363_set_ctrl(struct v4l2_ctrl *ctrl)
-// {
-// 	struct imx363 *imx363 =
-// 		container_of(ctrl->handler, struct imx363, ctrl_handler);
-// 	struct i2c_client *client = v4l2_get_subdevdata(&imx363->sd);
-// 	int ret;
-
-// 	if (ctrl->id == V4L2_CID_VBLANK) {
-// 		int exposure_max, exposure_def;
-
-// 		/* Update max exposure while meeting expected vblanking */
-// 		exposure_max = imx363->mode->height + ctrl->val - 4;
-// 		exposure_def = (exposure_max < IMX363_EXPOSURE_DEFAULT) ?
-// 			exposure_max : IMX363_EXPOSURE_DEFAULT;
-// 		__v4l2_ctrl_modify_range(imx363->exposure,
-// 					 imx363->exposure->minimum,
-// 					 exposure_max, imx363->exposure->step,
-// 					 exposure_def);
-// 	}
-
-// 	/*
-// 	 * Applying V4L2 control value only happens
-// 	 * when power is up for streaming
-// 	 */
-// 	if (pm_runtime_get_if_in_use(&client->dev) == 0)
-// 		return 0;
-
-// 	switch (ctrl->id) {
-// 	case V4L2_CID_ANALOGUE_GAIN:
-// 		ret = imx363_write_reg(imx363, IMX363_REG_ANA_GAIN_GLOBAL,
-// 				       IMX363_REG_VALUE_08BIT, ctrl->val);
-// 		break;
-// 	case V4L2_CID_EXPOSURE:
-// 		ret = imx363_write_reg(imx363, IMX363_REG_COARSE_INTEG_TIME,
-// 				       IMX363_REG_VALUE_16BIT, ctrl->val);
-// 		break;
-// 	case V4L2_CID_DIGITAL_GAIN:
-// 		ret = imx363_write_reg(imx363, IMX363_REG_DIG_GAIN_GLOBAL,
-// 				       IMX363_REG_VALUE_16BIT, ctrl->val);
-// 		break;
-// 	case V4L2_CID_HFLIP:
-// 	case V4L2_CID_VFLIP:
-// 		ret = imx363_write_reg(imx363, IMX363_REG_ORIENTATION, 1,
-// 				       imx363->hflip->val |
-// 				       imx363->vflip->val << 1);
-// 		break;
-// 	case V4L2_CID_VBLANK:
-// 		ret = imx363_write_reg(imx363, IMX363_REG_FRM_LENGTH_LINES,
-// 				       IMX363_REG_VALUE_16BIT,
-// 				       imx363->mode->height + ctrl->val);
-// 		break;
-// 	default:
-// 		dev_info(&client->dev,
-// 			 "ctrl(id:0x%x,val:0x%x) is not handled\n",
-// 			 ctrl->id, ctrl->val);
-// 		ret = -EINVAL;
-// 		break;
-// 	}
-
-// 	pm_runtime_put(&client->dev);
-
-// 	return ret;
-// }
-
-// static const struct v4l2_ctrl_ops imx363_ctrl_ops = {
-// 	.s_ctrl = imx363_set_ctrl,
-// };
-
-// static int imx363_enum_mbus_code(struct v4l2_subdev *sd,
-// 				 struct v4l2_subdev_pad_config *cfg,
-// 				 struct v4l2_subdev_mbus_code_enum *code)
-// {
-// 	struct imx363 *imx363 = to_imx363(sd);
-
-// 	if (code->index >= (ARRAY_SIZE(codes) / 4))
-// 		return -EINVAL;
-
-// 	code->code = imx363_get_format_code(imx363, codes[code->index * 4]);
-
-// 	return 0;
-// }
-
-// static int imx363_enum_frame_size(struct v4l2_subdev *sd,
-// 				  struct v4l2_subdev_pad_config *cfg,
-// 				  struct v4l2_subdev_frame_size_enum *fse)
-// {
-// 	struct imx363 *imx363 = to_imx363(sd);
-
-// 	if (fse->index >= ARRAY_SIZE(supported_modes))
-// 		return -EINVAL;
-
-// 	if (fse->code != imx363_get_format_code(imx363, fse->code))
-// 		return -EINVAL;
-
-// 	fse->min_width = supported_modes[fse->index].width;
-// 	fse->max_width = fse->min_width;
-// 	fse->min_height = supported_modes[fse->index].height;
-// 	fse->max_height = fse->min_height;
-
-// 	return 0;
-// }
-
-// static void imx363_reset_colorspace(struct v4l2_mbus_framefmt *fmt)
-// {
-// 	fmt->colorspace = V4L2_COLORSPACE_SRGB;
-// 	fmt->ycbcr_enc = V4L2_MAP_YCBCR_ENC_DEFAULT(fmt->colorspace);
-// 	fmt->quantization = V4L2_MAP_QUANTIZATION_DEFAULT(true,
-// 							  fmt->colorspace,
-// 							  fmt->ycbcr_enc);
-// 	fmt->xfer_func = V4L2_MAP_XFER_FUNC_DEFAULT(fmt->colorspace);
-// }
-
-// static void imx363_update_pad_format(struct imx363 *imx363,
-// 				     const struct imx363_mode *mode,
-// 				     struct v4l2_subdev_format *fmt)
-// {
-// 	fmt->format.width = mode->width;
-// 	fmt->format.height = mode->height;
-// 	fmt->format.field = V4L2_FIELD_NONE;
-// 	imx363_reset_colorspace(&fmt->format);
-// }
-
-// static int __imx363_get_pad_format(struct imx363 *imx363,
-// 				   struct v4l2_subdev_pad_config *cfg,
-// 				   struct v4l2_subdev_format *fmt)
-// {
-// 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
-// 		struct v4l2_mbus_framefmt *try_fmt =
-// 			v4l2_subdev_get_try_format(&imx363->sd, cfg, fmt->pad);
-// 		/* update the code which could change due to vflip or hflip: */
-// 		try_fmt->code = imx363_get_format_code(imx363, try_fmt->code);
-// 		fmt->format = *try_fmt;
-// 	} else {
-// 		imx363_update_pad_format(imx363, imx363->mode, fmt);
-// 		fmt->format.code = imx363_get_format_code(imx363,
-// 							  imx363->fmt.code);
-// 	}
-
-// 	return 0;
-// }
-
-// static int imx363_get_pad_format(struct v4l2_subdev *sd,
-// 				 struct v4l2_subdev_pad_config *cfg,
-// 				 struct v4l2_subdev_format *fmt)
-// {
-// 	struct imx363 *imx363 = to_imx363(sd);
-// 	int ret;
-
-// 	mutex_lock(&imx363->mutex);
-// 	ret = __imx363_get_pad_format(imx363, cfg, fmt);
-// 	mutex_unlock(&imx363->mutex);
-
-// 	return ret;
-// }
-
-// static int imx363_set_pad_format(struct v4l2_subdev *sd,
-// 				 struct v4l2_subdev_pad_config *cfg,
-// 				 struct v4l2_subdev_format *fmt)
-// {
-// 	struct imx363 *imx363 = to_imx363(sd);
-// 	const struct imx363_mode *mode;
-// 	struct v4l2_mbus_framefmt *framefmt;
-// 	int exposure_max, exposure_def, hblank;
-// 	unsigned int i;
-
-// 	mutex_lock(&imx363->mutex);
-
-// 	for (i = 0; i < ARRAY_SIZE(codes); i++)
-// 		if (codes[i] == fmt->format.code)
-// 			break;
-// 	if (i >= ARRAY_SIZE(codes))
-// 		i = 0;
-
-// 	/* Bayer order varies with flips */
-// 	fmt->format.code = imx363_get_format_code(imx363, codes[i]);
-
-// 	mode = v4l2_find_nearest_size(supported_modes,
-// 				      ARRAY_SIZE(supported_modes),
-// 				      width, height,
-// 				      fmt->format.width, fmt->format.height);
-// 	imx363_update_pad_format(imx363, mode, fmt);
-// 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
-// 		framefmt = v4l2_subdev_get_try_format(sd, cfg, fmt->pad);
-// 		*framefmt = fmt->format;
-// 	} else if (imx363->mode != mode ||
-// 		   imx363->fmt.code != fmt->format.code) {
-// 		imx363->fmt = fmt->format;
-// 		imx363->mode = mode;
-// 		/* Update limits and set FPS to default */
-// 		// __v4l2_ctrl_modify_range(imx363->vblank, IMX363_VBLANK_MIN,
-// 		// 			 IMX363_VTS_MAX - mode->height, 1,
-// 		// 			 mode->vts_def - mode->height);
-// 		__v4l2_ctrl_s_ctrl(imx363->vblank,
-// 				   mode->vts_def - mode->height);
-// 		/* Update max exposure while meeting expected vblanking */
-// 		exposure_max = mode->vts_def - 4;
-// 		exposure_def = (exposure_max < IMX363_EXPOSURE_DEFAULT) ?
-// 			exposure_max : IMX363_EXPOSURE_DEFAULT;
-// 		__v4l2_ctrl_modify_range(imx363->exposure,
-// 					 imx363->exposure->minimum,
-// 					 exposure_max, imx363->exposure->step,
-// 					 exposure_def);
-// 		/*
-// 		 * Currently PPL is fixed to IMX363_PPL_DEFAULT, so hblank
-// 		 * depends on mode->width only, and is not changeble in any
-// 		 * way other than changing the mode.
-// 		 */
-// 		hblank = IMX363_PPL_DEFAULT - mode->width;
-// 		__v4l2_ctrl_modify_range(imx363->hblank, hblank, hblank, 1,
-// 					 hblank);
-// 	}
-
-// 	mutex_unlock(&imx363->mutex);
-
-// 	return 0;
-// }
-
-// static int imx363_set_framefmt(struct imx363 *imx363)
-// {
-// 	switch (imx363->fmt.code) {
-// 	case MEDIA_BUS_FMT_SRGGB10_1X10:
-// 	case MEDIA_BUS_FMT_SGRBG10_1X10:
-// 	case MEDIA_BUS_FMT_SGBRG10_1X10:
-// 	case MEDIA_BUS_FMT_SBGGR10_1X10:
-// 		return imx363_write_regs(imx363, raw10_framefmt_regs,
-// 					ARRAY_SIZE(raw10_framefmt_regs));
-// 	}
-
-// 	return -EINVAL;
-// }
-
-// static const struct v4l2_rect *
-// __imx363_get_pad_crop(struct imx363 *imx363, struct v4l2_subdev_pad_config *cfg,
-// 		      unsigned int pad, enum v4l2_subdev_format_whence which)
-// {
-// 	switch (which) {
-// 	case V4L2_SUBDEV_FORMAT_TRY:
-// 		return v4l2_subdev_get_try_crop(&imx363->sd, cfg, pad);
-// 	case V4L2_SUBDEV_FORMAT_ACTIVE:
-// 		return &imx363->mode->crop;
-// 	}
-
-// 	return NULL;
-// }
-
-// static int imx363_get_selection(struct v4l2_subdev *sd,
-// 				struct v4l2_subdev_pad_config *cfg,
-// 				struct v4l2_subdev_selection *sel)
-// {
-// 	switch (sel->target) {
-// 	case V4L2_SEL_TGT_CROP: {
-// 		struct imx363 *imx363 = to_imx363(sd);
-
-// 		mutex_lock(&imx363->mutex);
-// 		sel->r = *__imx363_get_pad_crop(imx363, cfg, sel->pad,
-// 						sel->which);
-// 		mutex_unlock(&imx363->mutex);
-
-// 		return 0;
-// 	}
-
-// 	case V4L2_SEL_TGT_NATIVE_SIZE:
-// 		sel->r.top = 0;
-// 		sel->r.left = 0;
-// 		sel->r.width = IMX363_NATIVE_WIDTH;
-// 		sel->r.height = IMX363_NATIVE_HEIGHT;
-
-// 		return 0;
-
-// 	case V4L2_SEL_TGT_CROP_DEFAULT:
-// 		sel->r.top = IMX363_PIXEL_ARRAY_TOP;
-// 		sel->r.left = IMX363_PIXEL_ARRAY_LEFT;
-// 		sel->r.width = IMX363_PIXEL_ARRAY_WIDTH;
-// 		sel->r.height = IMX363_PIXEL_ARRAY_HEIGHT;
-
-// 		return 0;
-// 	}
-
-// 	return -EINVAL;
-// }
-
-// static int imx363_start_streaming(struct imx363 *imx363)
-// {
-// 	struct i2c_client *client = v4l2_get_subdevdata(&imx363->sd);
-// 	const struct imx363_reg_list *reg_list;
-// 	int ret;
-
-// 	/* Apply default configuration */
-// 	reg_list = &setup_reg_list;
-// 	ret = imx363_write_regs(imx363, reg_list->regs, reg_list->num_of_regs);
-// 	if (ret) {
-// 		dev_err(&client->dev, "%s failed to set mode\n", __func__);
-// 		return ret;
-// 	}
-
-// 	/* Set up registers according to current mode */
-// 	reg_list = &imx363->mode->reg_list;
-// 	ret = imx363_write_regs(imx363, reg_list->regs, reg_list->num_of_regs);
-// 	if (ret) {
-// 		dev_err(&client->dev, "%s failed to set mode\n", __func__);
-// 		return ret;
-// 	}
-
-// 	ret = imx363_set_framefmt(imx363);
-// 	if (ret) {
-// 		dev_err(&client->dev, "%s failed to set frame format: %d\n",
-// 			__func__, ret);
-// 		return ret;
-// 	}
-
-// 	/* Apply customized values from user */
-// 	ret =  __v4l2_ctrl_handler_setup(imx363->sd.ctrl_handler);
-// 	if (ret)
-// 		return ret;
-
-// 	/* set stream on register */
-// 	return imx363_write_reg(imx363, IMX363_REG_MODE_SELECT,
-// 				IMX363_REG_VALUE_08BIT, IMX363_MODE_STREAMING);
-// }
-
-// static void imx363_stop_streaming(struct imx363 *imx363)
-// {
-// 	struct i2c_client *client = v4l2_get_subdevdata(&imx363->sd);
-// 	int ret;
-
-// 	/* set stream off register */
-// 	ret = imx363_write_reg(imx363, IMX363_REG_MODE_SELECT,
-// 			       IMX363_REG_VALUE_08BIT, IMX363_MODE_STANDBY);
-// 	if (ret)
-// 		dev_err(&client->dev, "%s failed to set stream\n", __func__);
-// }
-
-// static int imx363_set_stream(struct v4l2_subdev *sd, int enable)
-// {
-// 	struct imx363 *imx363 = to_imx363(sd);
-// 	struct i2c_client *client = v4l2_get_subdevdata(sd);
-// 	int ret = 0;
-
-// 	mutex_lock(&imx363->mutex);
-// 	if (imx363->streaming == enable) {
-// 		mutex_unlock(&imx363->mutex);
-// 		return 0;
-// 	}
-
-// 	if (enable) {
-// 		ret = pm_runtime_get_sync(&client->dev);
-// 		if (ret < 0) {
-// 			pm_runtime_put_noidle(&client->dev);
-// 			goto err_unlock;
-// 		}
-
-// 		/*
-// 		 * Apply default & customized values
-// 		 * and then start streaming.
-// 		 */
-// 		ret = imx363_start_streaming(imx363);
-// 		if (ret)
-// 			goto err_rpm_put;
-// 	} else {
-// 		imx363_stop_streaming(imx363);
-// 		pm_runtime_put(&client->dev);
-// 	}
-
-// 	imx363->streaming = enable;
-
-// 	/* vflip and hflip cannot change during streaming */
-// 	__v4l2_ctrl_grab(imx363->vflip, enable);
-// 	__v4l2_ctrl_grab(imx363->hflip, enable);
-
-// 	mutex_unlock(&imx363->mutex);
-
-// 	return ret;
-
-// err_rpm_put:
-// 	pm_runtime_put(&client->dev);
-// err_unlock:
-// 	mutex_unlock(&imx363->mutex);
-
-// 	return ret;
-// }
+/* Write a list of registers */
+static int imx363_write_regs(struct imx363 *imx363,
+			     const struct imx363_reg *regs, u32 len)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(&imx363->sd);
+	unsigned int i;
+	int ret;
+
+	for (i = 0; i < len; i++) {
+		ret = imx363_write_reg(imx363, regs[i].address, regs[i].val_len, regs[i].val);
+		if (ret) {
+			dev_err_ratelimited(&client->dev,
+					    "Failed to write reg 0x%4.4x. error = %d\n",
+					    regs[i].address, ret);
+
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
+/* Get bayer order based on flip setting. */
+static u32 imx363_get_format_code(struct imx363 *imx363, u32 code)
+{
+	unsigned int i;
+
+	lockdep_assert_held(&imx363->mutex);
+
+	for (i = 0; i < ARRAY_SIZE(codes); i++)
+		if (codes[i] == code)
+			break;
+
+	if (i >= ARRAY_SIZE(codes))
+		i = 0;
+
+	i = (i & ~3) | (imx363->vflip->val ? 2 : 0) |
+	    (imx363->hflip->val ? 1 : 0);
+
+	return codes[i];
+}
+
+static void imx363_set_default_format(struct imx363 *imx363)
+{
+	struct v4l2_mbus_framefmt *fmt;
+
+	fmt = &imx363->fmt;
+	fmt->code = MEDIA_BUS_FMT_SRGGB10_1X10;
+	fmt->colorspace = V4L2_COLORSPACE_SRGB;
+	fmt->ycbcr_enc = V4L2_MAP_YCBCR_ENC_DEFAULT(fmt->colorspace);
+	fmt->quantization = V4L2_MAP_QUANTIZATION_DEFAULT(true,
+							  fmt->colorspace,
+							  fmt->ycbcr_enc);
+	fmt->xfer_func = V4L2_MAP_XFER_FUNC_DEFAULT(fmt->colorspace);
+	fmt->width = supported_modes[0].width;
+	fmt->height = supported_modes[0].height;
+	fmt->field = V4L2_FIELD_NONE;
+}
+
+static int imx363_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
+{
+	struct imx363 *imx363 = to_imx363(sd);
+	struct v4l2_mbus_framefmt *try_fmt =
+		v4l2_subdev_get_try_format(sd, fh->pad, 0);
+	struct v4l2_rect *try_crop;
+
+	mutex_lock(&imx363->mutex);
+
+	/* Initialize try_fmt */
+	try_fmt->width = supported_modes[0].width;
+	try_fmt->height = supported_modes[0].height;
+	try_fmt->code = imx363_get_format_code(imx363,
+					       MEDIA_BUS_FMT_SRGGB10_1X10);
+	try_fmt->field = V4L2_FIELD_NONE;
+
+	/* Initialize try_crop rectangle. */
+	try_crop = v4l2_subdev_get_try_crop(sd, fh->pad, 0);
+	try_crop->top = IMX363_PIXEL_ARRAY_TOP;
+	try_crop->left = IMX363_PIXEL_ARRAY_LEFT;
+	try_crop->width = IMX363_PIXEL_ARRAY_WIDTH;
+	try_crop->height = IMX363_PIXEL_ARRAY_HEIGHT;
+
+	mutex_unlock(&imx363->mutex);
+
+	return 0;
+}
+
+static int imx363_set_ctrl(struct v4l2_ctrl *ctrl)
+{
+	struct imx363 *imx363 =
+		container_of(ctrl->handler, struct imx363, ctrl_handler);
+	struct i2c_client *client = v4l2_get_subdevdata(&imx363->sd);
+	int ret;
+
+	if (ctrl->id == V4L2_CID_VBLANK) {
+		int exposure_max, exposure_def;
+
+		/* Update max exposure while meeting expected vblanking */
+		exposure_max = imx363->mode->height + ctrl->val - 4;
+		exposure_def = (exposure_max < IMX363_EXPOSURE_DEFAULT) ?
+			exposure_max : IMX363_EXPOSURE_DEFAULT;
+		__v4l2_ctrl_modify_range(imx363->exposure,
+					 imx363->exposure->minimum,
+					 exposure_max, imx363->exposure->step,
+					 exposure_def);
+	}
+
+	/*
+	 * Applying V4L2 control value only happens
+	 * when power is up for streaming
+	 */
+	if (pm_runtime_get_if_in_use(&client->dev) == 0)
+		return 0;
+
+	switch (ctrl->id) {
+	case V4L2_CID_ANALOGUE_GAIN:
+		ret = imx363_write_reg(imx363, IMX363_REG_ANA_GAIN_GLOBAL,
+				       IMX363_REG_VALUE_08BIT, ctrl->val);
+		break;
+	case V4L2_CID_EXPOSURE:
+		ret = imx363_write_reg(imx363, IMX363_REG_COARSE_INTEG_TIME,
+				       IMX363_REG_VALUE_16BIT, ctrl->val);
+		break;
+	case V4L2_CID_DIGITAL_GAIN:
+		ret = imx363_write_reg(imx363, IMX363_REG_DIG_GAIN_GLOBAL,
+				       IMX363_REG_VALUE_16BIT, ctrl->val);
+		break;
+	case V4L2_CID_HFLIP:
+	case V4L2_CID_VFLIP:
+		ret = imx363_write_reg(imx363, IMX363_REG_ORIENTATION, 1,
+				       imx363->hflip->val |
+				       imx363->vflip->val << 1);
+		break;
+	case V4L2_CID_VBLANK:
+		ret = imx363_write_reg(imx363, IMX363_REG_FRM_LENGTH_LINES,
+				       IMX363_REG_VALUE_16BIT,
+				       imx363->mode->height + ctrl->val);
+		break;
+	default:
+		dev_info(&client->dev,
+			 "ctrl(id:0x%x,val:0x%x) is not handled\n",
+			 ctrl->id, ctrl->val);
+		ret = -EINVAL;
+		break;
+	}
+
+	pm_runtime_put(&client->dev);
+
+	return ret;
+}
+
+static const struct v4l2_ctrl_ops imx363_ctrl_ops = {
+	.s_ctrl = imx363_set_ctrl,
+};
+
+static int imx363_enum_mbus_code(struct v4l2_subdev *sd,
+				 struct v4l2_subdev_pad_config *cfg,
+				 struct v4l2_subdev_mbus_code_enum *code)
+{
+	struct imx363 *imx363 = to_imx363(sd);
+
+	if (code->index >= (ARRAY_SIZE(codes) / 4))
+		return -EINVAL;
+
+	code->code = imx363_get_format_code(imx363, codes[code->index * 4]);
+
+	return 0;
+}
+
+static int imx363_enum_frame_size(struct v4l2_subdev *sd,
+				  struct v4l2_subdev_pad_config *cfg,
+				  struct v4l2_subdev_frame_size_enum *fse)
+{
+	struct imx363 *imx363 = to_imx363(sd);
+
+	if (fse->index >= ARRAY_SIZE(supported_modes))
+		return -EINVAL;
+
+	if (fse->code != imx363_get_format_code(imx363, fse->code))
+		return -EINVAL;
+
+	fse->min_width = supported_modes[fse->index].width;
+	fse->max_width = fse->min_width;
+	fse->min_height = supported_modes[fse->index].height;
+	fse->max_height = fse->min_height;
+
+	return 0;
+}
+
+static void imx363_reset_colorspace(struct v4l2_mbus_framefmt *fmt)
+{
+	fmt->colorspace = V4L2_COLORSPACE_SRGB;
+	fmt->ycbcr_enc = V4L2_MAP_YCBCR_ENC_DEFAULT(fmt->colorspace);
+	fmt->quantization = V4L2_MAP_QUANTIZATION_DEFAULT(true,
+							  fmt->colorspace,
+							  fmt->ycbcr_enc);
+	fmt->xfer_func = V4L2_MAP_XFER_FUNC_DEFAULT(fmt->colorspace);
+}
+
+static void imx363_update_pad_format(struct imx363 *imx363,
+				     const struct imx363_mode *mode,
+				     struct v4l2_subdev_format *fmt)
+{
+	fmt->format.width = mode->width;
+	fmt->format.height = mode->height;
+	fmt->format.field = V4L2_FIELD_NONE;
+	imx363_reset_colorspace(&fmt->format);
+}
+
+static int __imx363_get_pad_format(struct imx363 *imx363,
+				   struct v4l2_subdev_pad_config *cfg,
+				   struct v4l2_subdev_format *fmt)
+{
+	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
+		struct v4l2_mbus_framefmt *try_fmt =
+			v4l2_subdev_get_try_format(&imx363->sd, cfg, fmt->pad);
+		/* update the code which could change due to vflip or hflip: */
+		try_fmt->code = imx363_get_format_code(imx363, try_fmt->code);
+		fmt->format = *try_fmt;
+	} else {
+		imx363_update_pad_format(imx363, imx363->mode, fmt);
+		fmt->format.code = imx363_get_format_code(imx363,
+							  imx363->fmt.code);
+	}
+
+	return 0;
+}
+
+static int imx363_get_pad_format(struct v4l2_subdev *sd,
+				 struct v4l2_subdev_pad_config *cfg,
+				 struct v4l2_subdev_format *fmt)
+{
+	struct imx363 *imx363 = to_imx363(sd);
+	int ret;
+
+	mutex_lock(&imx363->mutex);
+	ret = __imx363_get_pad_format(imx363, cfg, fmt);
+	mutex_unlock(&imx363->mutex);
+
+	return ret;
+}
+
+static int imx363_set_pad_format(struct v4l2_subdev *sd,
+				 struct v4l2_subdev_pad_config *cfg,
+				 struct v4l2_subdev_format *fmt)
+{
+	struct imx363 *imx363 = to_imx363(sd);
+	const struct imx363_mode *mode;
+	struct v4l2_mbus_framefmt *framefmt;
+	int exposure_max, exposure_def, hblank;
+	unsigned int i;
+
+	mutex_lock(&imx363->mutex);
+
+	for (i = 0; i < ARRAY_SIZE(codes); i++)
+		if (codes[i] == fmt->format.code)
+			break;
+	if (i >= ARRAY_SIZE(codes))
+		i = 0;
+
+	/* Bayer order varies with flips */
+	fmt->format.code = imx363_get_format_code(imx363, codes[i]);
+
+	mode = v4l2_find_nearest_size(supported_modes,
+				      ARRAY_SIZE(supported_modes),
+				      width, height,
+				      fmt->format.width, fmt->format.height);
+	imx363_update_pad_format(imx363, mode, fmt);
+	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
+		framefmt = v4l2_subdev_get_try_format(sd, cfg, fmt->pad);
+		*framefmt = fmt->format;
+	} else if (imx363->mode != mode ||
+		   imx363->fmt.code != fmt->format.code) {
+		imx363->fmt = fmt->format;
+		imx363->mode = mode;
+		/* Update limits and set FPS to default */
+		// __v4l2_ctrl_modify_range(imx363->vblank, IMX363_VBLANK_MIN,
+		// 			 IMX363_VTS_MAX - mode->height, 1,
+		// 			 mode->vts_def - mode->height);
+		__v4l2_ctrl_s_ctrl(imx363->vblank,
+				   mode->vts_def - mode->height);
+		/* Update max exposure while meeting expected vblanking */
+		exposure_max = mode->vts_def - 4;
+		exposure_def = (exposure_max < IMX363_EXPOSURE_DEFAULT) ?
+			exposure_max : IMX363_EXPOSURE_DEFAULT;
+		__v4l2_ctrl_modify_range(imx363->exposure,
+					 imx363->exposure->minimum,
+					 exposure_max, imx363->exposure->step,
+					 exposure_def);
+		/*
+		 * Currently PPL is fixed to IMX363_PPL_DEFAULT, so hblank
+		 * depends on mode->width only, and is not changeble in any
+		 * way other than changing the mode.
+		 */
+		hblank = IMX363_PPL_DEFAULT - mode->width;
+		__v4l2_ctrl_modify_range(imx363->hblank, hblank, hblank, 1,
+					 hblank);
+	}
+
+	mutex_unlock(&imx363->mutex);
+
+	return 0;
+}
+
+static int imx363_set_framefmt(struct imx363 *imx363)
+{
+	switch (imx363->fmt.code) {
+	case MEDIA_BUS_FMT_SRGGB10_1X10:
+	case MEDIA_BUS_FMT_SGRBG10_1X10:
+	case MEDIA_BUS_FMT_SGBRG10_1X10:
+	case MEDIA_BUS_FMT_SBGGR10_1X10:
+		return imx363_write_regs(imx363, raw10_framefmt_regs,
+					ARRAY_SIZE(raw10_framefmt_regs));
+	}
+
+	return -EINVAL;
+}
+
+static const struct v4l2_rect *
+__imx363_get_pad_crop(struct imx363 *imx363, struct v4l2_subdev_pad_config *cfg,
+		      unsigned int pad, enum v4l2_subdev_format_whence which)
+{
+	switch (which) {
+	case V4L2_SUBDEV_FORMAT_TRY:
+		return v4l2_subdev_get_try_crop(&imx363->sd, cfg, pad);
+	case V4L2_SUBDEV_FORMAT_ACTIVE:
+		return &imx363->mode->crop;
+	}
+
+	return NULL;
+}
+
+static int imx363_get_selection(struct v4l2_subdev *sd,
+				struct v4l2_subdev_pad_config *cfg,
+				struct v4l2_subdev_selection *sel)
+{
+	switch (sel->target) {
+	case V4L2_SEL_TGT_CROP: {
+		struct imx363 *imx363 = to_imx363(sd);
+
+		mutex_lock(&imx363->mutex);
+		sel->r = *__imx363_get_pad_crop(imx363, cfg, sel->pad,
+						sel->which);
+		mutex_unlock(&imx363->mutex);
+
+		return 0;
+	}
+
+	case V4L2_SEL_TGT_NATIVE_SIZE:
+		sel->r.top = 0;
+		sel->r.left = 0;
+		sel->r.width = IMX363_NATIVE_WIDTH;
+		sel->r.height = IMX363_NATIVE_HEIGHT;
+
+		return 0;
+
+	case V4L2_SEL_TGT_CROP_DEFAULT:
+		sel->r.top = IMX363_PIXEL_ARRAY_TOP;
+		sel->r.left = IMX363_PIXEL_ARRAY_LEFT;
+		sel->r.width = IMX363_PIXEL_ARRAY_WIDTH;
+		sel->r.height = IMX363_PIXEL_ARRAY_HEIGHT;
+
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
+static int imx363_start_streaming(struct imx363 *imx363)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(&imx363->sd);
+	const struct imx363_reg_list *reg_list;
+	int ret;
+
+	/* Apply default configuration */
+	reg_list = &setup_reg_list;
+	ret = imx363_write_regs(imx363, reg_list->regs, reg_list->num_of_regs);
+	if (ret) {
+		dev_err(&client->dev, "%s failed to set mode\n", __func__);
+		return ret;
+	}
+
+	/* Set up registers according to current mode */
+	reg_list = &imx363->mode->reg_list;
+	ret = imx363_write_regs(imx363, reg_list->regs, reg_list->num_of_regs);
+	if (ret) {
+		dev_err(&client->dev, "%s failed to set mode\n", __func__);
+		return ret;
+	}
+
+	ret = imx363_set_framefmt(imx363);
+	if (ret) {
+		dev_err(&client->dev, "%s failed to set frame format: %d\n",
+			__func__, ret);
+		return ret;
+	}
+
+	/* Apply customized values from user */
+	ret =  __v4l2_ctrl_handler_setup(imx363->sd.ctrl_handler);
+	if (ret)
+		return ret;
+
+	/* set stream on register */
+	return imx363_write_reg(imx363, IMX363_REG_MODE_SELECT,
+				IMX363_REG_VALUE_08BIT, IMX363_MODE_STREAMING);
+}
+
+static void imx363_stop_streaming(struct imx363 *imx363)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(&imx363->sd);
+	int ret;
+
+	/* set stream off register */
+	ret = imx363_write_reg(imx363, IMX363_REG_MODE_SELECT,
+			       IMX363_REG_VALUE_08BIT, IMX363_MODE_STANDBY);
+	if (ret)
+		dev_err(&client->dev, "%s failed to set stream\n", __func__);
+}
+
+static int imx363_set_stream(struct v4l2_subdev *sd, int enable)
+{
+	struct imx363 *imx363 = to_imx363(sd);
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	int ret = 0;
+
+	mutex_lock(&imx363->mutex);
+	if (imx363->streaming == enable) {
+		mutex_unlock(&imx363->mutex);
+		return 0;
+	}
+
+	if (enable) {
+		ret = pm_runtime_get_sync(&client->dev);
+		if (ret < 0) {
+			pm_runtime_put_noidle(&client->dev);
+			goto err_unlock;
+		}
+
+		/*
+		 * Apply default & customized values
+		 * and then start streaming.
+		 */
+		ret = imx363_start_streaming(imx363);
+		if (ret)
+			goto err_rpm_put;
+	} else {
+		imx363_stop_streaming(imx363);
+		pm_runtime_put(&client->dev);
+	}
+
+	imx363->streaming = enable;
+
+	/* vflip and hflip cannot change during streaming */
+	__v4l2_ctrl_grab(imx363->vflip, enable);
+	__v4l2_ctrl_grab(imx363->hflip, enable);
+
+	mutex_unlock(&imx363->mutex);
+
+	return ret;
+
+err_rpm_put:
+	pm_runtime_put(&client->dev);
+err_unlock:
+	mutex_unlock(&imx363->mutex);
+
+	return ret;
+}
 
 /* Power/clock management functions */
 static int imx363_power_on(struct device *dev)
@@ -959,52 +981,52 @@ reg_off:
 	return ret;
 }
 
-// static int imx363_power_off(struct device *dev)
-// {
-// 	struct i2c_client *client = to_i2c_client(dev);
-// 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
-// 	struct imx363 *imx363 = to_imx363(sd);
+static int imx363_power_off(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct v4l2_subdev *sd = i2c_get_clientdata(client);
+	struct imx363 *imx363 = to_imx363(sd);
 
-// 	gpiod_set_value_cansleep(imx363->reset_gpio, 0);
-// 	regulator_bulk_disable(IMX363_NUM_SUPPLIES, imx363->supplies);
-// 	clk_disable_unprepare(imx363->xclk);
+	gpiod_set_value_cansleep(imx363->reset_gpio, 0);
+	regulator_bulk_disable(IMX363_NUM_SUPPLIES, imx363->supplies);
+	clk_disable_unprepare(imx363->xclk);
 
-// 	return 0;
-// }
+	return 0;
+}
 
-// static int __maybe_unused imx363_suspend(struct device *dev)
-// {
-// 	struct i2c_client *client = to_i2c_client(dev);
-// 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
-// 	struct imx363 *imx363 = to_imx363(sd);
+static int __maybe_unused imx363_suspend(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct v4l2_subdev *sd = i2c_get_clientdata(client);
+	struct imx363 *imx363 = to_imx363(sd);
 
-// 	if (imx363->streaming)
-// 		imx363_stop_streaming(imx363);
+	if (imx363->streaming)
+		imx363_stop_streaming(imx363);
 
-// 	return 0;
-// }
+	return 0;
+}
 
-// static int __maybe_unused imx363_resume(struct device *dev)
-// {
-// 	struct i2c_client *client = to_i2c_client(dev);
-// 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
-// 	struct imx363 *imx363 = to_imx363(sd);
-// 	int ret;
+static int __maybe_unused imx363_resume(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct v4l2_subdev *sd = i2c_get_clientdata(client);
+	struct imx363 *imx363 = to_imx363(sd);
+	int ret;
 
-// 	if (imx363->streaming) {
-// 		ret = imx363_start_streaming(imx363);
-// 		if (ret)
-// 			goto error;
-// 	}
+	if (imx363->streaming) {
+		ret = imx363_start_streaming(imx363);
+		if (ret)
+			goto error;
+	}
 
-// 	return 0;
+	return 0;
 
-// error:
-// 	imx363_stop_streaming(imx363);
-// 	imx363->streaming = 0;
+error:
+	imx363_stop_streaming(imx363);
+	imx363->streaming = 0;
 
-// 	return ret;
-// }
+	return ret;
+}
 
 // static int imx363_get_regulators(struct imx363 *imx363)
 // {
@@ -1045,128 +1067,207 @@ static int imx363_identify_module(struct imx363 *imx363)
 	return 0;
 }
 
-// static const struct v4l2_subdev_core_ops imx363_core_ops = {
-// 	.subscribe_event = v4l2_ctrl_subdev_subscribe_event,
-// 	.unsubscribe_event = v4l2_event_subdev_unsubscribe,
-// };
-
-// static const struct v4l2_subdev_video_ops imx363_video_ops = {
-// 	.s_stream = imx363_set_stream,
-// };
-
-// static const struct v4l2_subdev_pad_ops imx363_pad_ops = {
-// 	.enum_mbus_code = imx363_enum_mbus_code,
-// 	.get_fmt = imx363_get_pad_format,
-// 	.set_fmt = imx363_set_pad_format,
-// 	.get_selection = imx363_get_selection,
-// 	.enum_frame_size = imx363_enum_frame_size,
-// };
-
-static const struct v4l2_subdev_ops imx363_subdev_ops = {
-	// .core = &imx363_core_ops,
-	// .video = &imx363_video_ops,
-	// .pad = &imx363_pad_ops,
+static const struct v4l2_subdev_core_ops imx363_core_ops = {
+	.subscribe_event = v4l2_ctrl_subdev_subscribe_event,
+	.unsubscribe_event = v4l2_event_subdev_unsubscribe,
 };
 
-// static const struct v4l2_subdev_internal_ops imx363_internal_ops = {
-// 	.open = imx363_open,
-// };
+static const struct v4l2_subdev_video_ops imx363_video_ops = {
+	.s_stream = imx363_set_stream,
+};
+
+static const struct v4l2_subdev_pad_ops imx363_pad_ops = {
+	.enum_mbus_code = imx363_enum_mbus_code,
+	.get_fmt = imx363_get_pad_format,
+	.set_fmt = imx363_set_pad_format,
+	.get_selection = imx363_get_selection,
+	.enum_frame_size = imx363_enum_frame_size,
+};
+
+static const struct v4l2_subdev_ops imx363_subdev_ops = {
+	.core = &imx363_core_ops,
+	.video = &imx363_video_ops,
+	.pad = &imx363_pad_ops,
+};
+
+static const struct v4l2_subdev_internal_ops imx363_internal_ops = {
+	.open = imx363_open,
+};
 
 /* Initialize control handlers */
-// static int imx363_init_controls(struct imx363 *imx363)
-// {
-// 	struct i2c_client *client = v4l2_get_subdevdata(&imx363->sd);
-// 	struct v4l2_ctrl_handler *ctrl_hdlr;
-// 	unsigned int height = imx363->mode->height;
-// 	struct v4l2_fwnode_device_properties props;
-// 	int exposure_max, exposure_def, hblank;
-// 	int i, ret;
+static int imx363_init_controls(struct imx363 *imx363)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(&imx363->sd);
+	struct v4l2_ctrl_handler *ctrl_hdlr;
+	unsigned int height = imx363->mode->height;
+	struct v4l2_fwnode_device_properties props;
+	int exposure_max, exposure_def, hblank;
+	int ret;
 
-// 	ctrl_hdlr = &imx363->ctrl_handler;
-// 	ret = v4l2_ctrl_handler_init(ctrl_hdlr, 11);
-// 	if (ret)
-// 		return ret;
+	ctrl_hdlr = &imx363->ctrl_handler;
+	ret = v4l2_ctrl_handler_init(ctrl_hdlr, 11);
+	if (ret)
+		return ret;
 
-// 	mutex_init(&imx363->mutex);
-// 	ctrl_hdlr->lock = &imx363->mutex;
+	mutex_init(&imx363->mutex);
+	ctrl_hdlr->lock = &imx363->mutex;
 
-// 	/* By default, PIXEL_RATE is read only */
-// 	imx363->pixel_rate = v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops,
-// 					       V4L2_CID_PIXEL_RATE,
-// 					       IMX363_PIXEL_RATE,
-// 					       IMX363_PIXEL_RATE, 1,
-// 					       IMX363_PIXEL_RATE);
+	if (ctrl_hdlr->error) {
+		ret = ctrl_hdlr->error;
+		dev_err(&client->dev, "%s v4l2_ctrl_handler_init failed (%d)\n",
+			__func__, ret);
+		goto error;
+	}
 
-// 	/* Initial vblank/hblank/exposure parameters based on current mode */
-// 	imx363->vblank = v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops,
-// 					   V4L2_CID_VBLANK, IMX363_VBLANK_MIN,
-// 					   IMX363_VTS_MAX - height, 1,
-// 					   imx363->mode->vts_def - height);
-// 	hblank = IMX363_PPL_DEFAULT - imx363->mode->width;
-// 	imx363->hblank = v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops,
-// 					   V4L2_CID_HBLANK, hblank, hblank,
-// 					   1, hblank);
-// 	if (imx363->hblank)
-// 		imx363->hblank->flags |= V4L2_CTRL_FLAG_READ_ONLY;
-// 	exposure_max = imx363->mode->vts_def - 4;
-// 	exposure_def = (exposure_max < IMX363_EXPOSURE_DEFAULT) ?
-// 		exposure_max : IMX363_EXPOSURE_DEFAULT;
-// 	imx363->exposure = v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops,
-// 					     V4L2_CID_EXPOSURE,
-// 					     IMX363_EXPOSURE_MIN, exposure_max,
-// 					     IMX363_EXPOSURE_STEP,
-// 					     exposure_def);
+	/* By default, PIXEL_RATE is read only */
+	imx363->pixel_rate = v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops,
+					       V4L2_CID_PIXEL_RATE,
+					       IMX363_PIXEL_RATE,
+					       IMX363_PIXEL_RATE, 1,
+					       IMX363_PIXEL_RATE);
+	
+	if (ctrl_hdlr->error) {
+		ret = ctrl_hdlr->error;
+		dev_err(&client->dev, "%s imx363->pixel_rate failed (%d)\n",
+			__func__, ret);
+		goto error;
+	}
 
-// 	v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops, V4L2_CID_ANALOGUE_GAIN,
-// 			  IMX363_ANA_GAIN_MIN, IMX363_ANA_GAIN_MAX,
-// 			  IMX363_ANA_GAIN_STEP, IMX363_ANA_GAIN_DEFAULT);
+	imx363->link_freq = v4l2_ctrl_new_int_menu(ctrl_hdlr, &imx363_ctrl_ops,
+				       V4L2_CID_LINK_FREQ,
+				       ARRAY_SIZE(imx363_link_freq_menu) - 1, 0,
+				       imx363_link_freq_menu);
+	if (imx363->link_freq)
+		imx363->link_freq->flags |= V4L2_CTRL_FLAG_READ_ONLY;
 
-// 	v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops, V4L2_CID_DIGITAL_GAIN,
-// 			  IMX363_DGTL_GAIN_MIN, IMX363_DGTL_GAIN_MAX,
-// 			  IMX363_DGTL_GAIN_STEP, IMX363_DGTL_GAIN_DEFAULT);
+	if (ctrl_hdlr->error) {
+		ret = ctrl_hdlr->error;
+		dev_err(&client->dev, "%s imx363->link_freq failed (%d)\n",
+			__func__, ret);
+		goto error;
+	}
 
-// 	imx363->hflip = v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops,
-// 					  V4L2_CID_HFLIP, 0, 1, 1, 0);
-// 	if (imx363->hflip)
-// 		imx363->hflip->flags |= V4L2_CTRL_FLAG_MODIFY_LAYOUT;
+	/* Initial vblank/hblank/exposure parameters based on current mode */
+	imx363->vblank = v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops,
+					   V4L2_CID_VBLANK, IMX363_VBLANK_MIN,
+					   IMX363_VTS_MAX - height, 1,
+					   imx363->mode->vts_def - height);
 
-// 	imx363->vflip = v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops,
-// 					  V4L2_CID_VFLIP, 0, 1, 1, 0);
-// 	if (imx363->vflip)
-// 		imx363->vflip->flags |= V4L2_CTRL_FLAG_MODIFY_LAYOUT;
+	if (ctrl_hdlr->error) {
+		ret = ctrl_hdlr->error;
+		dev_err(&client->dev, "%s imx363->vblank failed (%d)\n",
+			__func__, ret);
+		goto error;
+	}
 
-// 	if (ctrl_hdlr->error) {
-// 		ret = ctrl_hdlr->error;
-// 		dev_err(&client->dev, "%s control init failed (%d)\n",
-// 			__func__, ret);
-// 		goto error;
-// 	}
+	hblank = IMX363_PPL_DEFAULT - imx363->mode->width;
+	imx363->hblank = v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops,
+					   V4L2_CID_HBLANK, hblank, hblank,
+					   1, hblank);
+	if (imx363->hblank)
+		imx363->hblank->flags |= V4L2_CTRL_FLAG_READ_ONLY;
 
-// 	ret = v4l2_fwnode_device_parse(&client->dev, &props);
-// 	if (ret)
-// 		goto error;
+	if (ctrl_hdlr->error) {
+		ret = ctrl_hdlr->error;
+		dev_err(&client->dev, "%s imx363->hblank failed (%d)\n",
+			__func__, ret);
+		goto error;
+	}
 
-// 	ret = v4l2_ctrl_new_fwnode_properties(ctrl_hdlr, &imx363_ctrl_ops,
-// 					      &props);
-// 	if (ret)
-// 		goto error;
+	exposure_max = imx363->mode->vts_def - 4;
+	exposure_def = (exposure_max < IMX363_EXPOSURE_DEFAULT) ?
+		exposure_max : IMX363_EXPOSURE_DEFAULT;
+	imx363->exposure = v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops,
+					     V4L2_CID_EXPOSURE,
+					     IMX363_EXPOSURE_MIN, exposure_max,
+					     IMX363_EXPOSURE_STEP,
+					     exposure_def);
 
-// 	imx363->sd.ctrl_handler = ctrl_hdlr;
+	if (ctrl_hdlr->error) {
+		ret = ctrl_hdlr->error;
+		dev_err(&client->dev, "%s imx363->exposure failed (%d)\n",
+			__func__, ret);
+		goto error;
+	}
 
-// 	return 0;
+	v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops, V4L2_CID_ANALOGUE_GAIN,
+			  IMX363_ANA_GAIN_MIN, IMX363_ANA_GAIN_MAX,
+			  IMX363_ANA_GAIN_STEP, IMX363_ANA_GAIN_DEFAULT);
 
-// error:
-// 	v4l2_ctrl_handler_free(ctrl_hdlr);
-// 	mutex_destroy(&imx363->mutex);
+	if (ctrl_hdlr->error) {
+		ret = ctrl_hdlr->error;
+		dev_err(&client->dev, "%s IMX363_ANA_GAIN failed (%d)\n",
+			__func__, ret);
+		goto error;
+	}
 
-// 	return ret;
-// }
+	v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops, V4L2_CID_DIGITAL_GAIN,
+			  IMX363_DGTL_GAIN_MIN, IMX363_DGTL_GAIN_MAX,
+			  IMX363_DGTL_GAIN_STEP, IMX363_DGTL_GAIN_DEFAULT);
 
-// static void imx363_free_controls(struct imx363 *imx363)
-// {
-// 	v4l2_ctrl_handler_free(imx363->sd.ctrl_handler);
-// 	mutex_destroy(&imx363->mutex);
-// }
+	if (ctrl_hdlr->error) {
+		ret = ctrl_hdlr->error;
+		dev_err(&client->dev, "%s IMX363_DGTL_GAIN failed (%d)\n",
+			__func__, ret);
+		goto error;
+	}
+
+	imx363->hflip = v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops,
+					  V4L2_CID_HFLIP, 0, 1, 1, 0);
+	if (imx363->hflip)
+		imx363->hflip->flags |= V4L2_CTRL_FLAG_MODIFY_LAYOUT;
+
+	if (ctrl_hdlr->error) {
+		ret = ctrl_hdlr->error;
+		dev_err(&client->dev, "%s imx363->hflip failed (%d)\n",
+			__func__, ret);
+		goto error;
+	}
+
+	imx363->vflip = v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops,
+					  V4L2_CID_VFLIP, 0, 1, 1, 0);
+	if (imx363->vflip)
+		imx363->vflip->flags |= V4L2_CTRL_FLAG_MODIFY_LAYOUT;
+
+	if (ctrl_hdlr->error) {
+		ret = ctrl_hdlr->error;
+		dev_err(&client->dev, "%s imx363->vflip failed (%d)\n",
+			__func__, ret);
+		goto error;
+	}
+
+	if (ctrl_hdlr->error) {
+		ret = ctrl_hdlr->error;
+		dev_err(&client->dev, "%s control init failed (%d)\n",
+			__func__, ret);
+		goto error;
+	}
+
+	ret = v4l2_fwnode_device_parse(&client->dev, &props);
+	if (ret)
+		goto error;
+
+	ret = v4l2_ctrl_new_fwnode_properties(ctrl_hdlr, &imx363_ctrl_ops,
+					      &props);
+	if (ret)
+		goto error;
+
+	imx363->sd.ctrl_handler = ctrl_hdlr;
+
+	return 0;
+
+error:
+	v4l2_ctrl_handler_free(ctrl_hdlr);
+	mutex_destroy(&imx363->mutex);
+
+	return ret;
+}
+
+static void imx363_free_controls(struct imx363 *imx363)
+{
+	v4l2_ctrl_handler_free(imx363->sd.ctrl_handler);
+	mutex_destroy(&imx363->mutex);
+}
 
 static int imx363_check_hwcfg(struct device *dev)
 {
@@ -1188,8 +1289,8 @@ static int imx363_check_hwcfg(struct device *dev)
 	}
 
 	/* Check the number of MIPI CSI2 data lanes */
-	if (ep_cfg.bus.mipi_csi2.num_data_lanes != 2) {
-		dev_err(dev, "only 2 data lanes are supported\n");
+	if (ep_cfg.bus.mipi_csi2.num_data_lanes != IMX363_NUM_LANES) {
+		dev_err(dev, "only 4 data lanes are supported\n");
 		goto error_out;
 	}
 
@@ -1285,85 +1386,85 @@ static int imx363_probe(struct i2c_client *client)
 	// 	goto error_power_off;
 
     dev_info(dev, "probed successfully\n");
-	// /* Set default mode to max resolution */
-	// imx363->mode = &supported_modes[0];
+	/* Set default mode to max resolution */
+	imx363->mode = &supported_modes[0];
 
-	// /* sensor doesn't enter LP-11 state upon power up until and unless
-	//  * streaming is started, so upon power up switch the modes to:
-	//  * streaming -> standby
-	//  */
-	// ret = imx363_write_reg(imx363, IMX363_REG_MODE_SELECT,
-	// 		       IMX363_REG_VALUE_08BIT, IMX363_MODE_STREAMING);
-	// if (ret < 0)
-	// 	goto error_power_off;
-	// usleep_range(100, 110);
+	/* sensor doesn't enter LP-11 state upon power up until and unless
+	 * streaming is started, so upon power up switch the modes to:
+	 * streaming -> standby
+	 */
+	ret = imx363_write_reg(imx363, IMX363_REG_MODE_SELECT,
+			       IMX363_REG_VALUE_08BIT, IMX363_MODE_STREAMING);
+	if (ret < 0)
+		goto error_power_off;
+	usleep_range(100, 110);
 
-	// /* put sensor back to standby mode */
-	// ret = imx363_write_reg(imx363, IMX363_REG_MODE_SELECT,
-	// 		       IMX363_REG_VALUE_08BIT, IMX363_MODE_STANDBY);
-	// if (ret < 0)
-	// 	goto error_power_off;
-	// usleep_range(100, 110);
+	/* put sensor back to standby mode */
+	ret = imx363_write_reg(imx363, IMX363_REG_MODE_SELECT,
+			       IMX363_REG_VALUE_08BIT, IMX363_MODE_STANDBY);
+	if (ret < 0)
+		goto error_power_off;
+	usleep_range(100, 110);
 
-	// ret = imx363_init_controls(imx363);
-	// if (ret)
-	// 	goto error_power_off;
+	ret = imx363_init_controls(imx363);
+	if (ret)
+		goto error_power_off;
 
-	// /* Initialize subdev */
-	// imx363->sd.internal_ops = &imx363_internal_ops;
-	// imx363->sd.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
-	// imx363->sd.entity.function = MEDIA_ENT_F_CAM_SENSOR;
+	/* Initialize subdev */
+	imx363->sd.internal_ops = &imx363_internal_ops;
+	imx363->sd.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
+	imx363->sd.entity.function = MEDIA_ENT_F_CAM_SENSOR;
 
-	// /* Initialize source pad */
-	// imx363->pad.flags = MEDIA_PAD_FL_SOURCE;
+	/* Initialize source pad */
+	imx363->pad.flags = MEDIA_PAD_FL_SOURCE;
 
-	// /* Initialize default format */
-	// imx363_set_default_format(imx363);
+	/* Initialize default format */
+	imx363_set_default_format(imx363);
 
-	// ret = media_entity_pads_init(&imx363->sd.entity, 1, &imx363->pad);
-	// if (ret) {
-	// 	dev_err(dev, "failed to init entity pads: %d\n", ret);
-	// 	goto error_handler_free;
-	// }
+	ret = media_entity_pads_init(&imx363->sd.entity, 1, &imx363->pad);
+	if (ret) {
+		dev_err(dev, "failed to init entity pads: %d\n", ret);
+		goto error_handler_free;
+	}
 
-	// ret = v4l2_async_register_subdev_sensor_common(&imx363->sd);
-	// if (ret < 0) {
-	// 	dev_err(dev, "failed to register sensor sub-device: %d\n", ret);
-	// 	goto error_media_entity;
-	// }
+	ret = v4l2_async_register_subdev_sensor(&imx363->sd);
+	if (ret < 0) {
+		dev_err(dev, "failed to register sensor sub-device: %d\n", ret);
+		goto error_media_entity;
+	}
 
-	// /* Enable runtime PM and turn off the device */
-	// pm_runtime_set_active(dev);
-	// pm_runtime_enable(dev);
-	// pm_runtime_idle(dev);
+	/* Enable runtime PM and turn off the device */
+	pm_runtime_set_active(dev);
+	pm_runtime_enable(dev);
+	pm_runtime_idle(dev);
 
 	return 0;
 
-// error_media_entity:
-// 	media_entity_cleanup(&imx363->sd.entity);
+error_media_entity:
+	media_entity_cleanup(&imx363->sd.entity);
 
-// error_handler_free:
-// 	imx363_free_controls(imx363);
+error_handler_free:
+	imx363_free_controls(imx363);
 
-// error_power_off:
-// 	imx363_power_off(dev);
+error_power_off:
+	imx363_power_off(dev);
 
-	// return ret;
+	return ret;
 }
 
 static int imx363_remove(struct i2c_client *client)
 {
-	// struct v4l2_subdev *sd = i2c_get_clientdata(client);
-	// struct imx363 *imx363 = to_imx363(sd);
+	struct v4l2_subdev *sd = i2c_get_clientdata(client);
+	struct imx363 *imx363 = to_imx363(sd);
 
-	// v4l2_async_unregister_subdev(sd);
-	// media_entity_cleanup(&sd->entity);
-	// imx363_free_controls(imx363);
+	v4l2_async_unregister_subdev(sd);
+	media_entity_cleanup(&sd->entity);
+	imx363_free_controls(imx363);
 
-	// pm_runtime_disable(&client->dev);
-	// if (!pm_runtime_status_suspended(&client->dev))
-	// 	imx363_power_off(&client->dev);
-	// pm_runtime_set_suspended(&client->dev);
+	pm_runtime_disable(&client->dev);
+	if (!pm_runtime_status_suspended(&client->dev))
+		imx363_power_off(&client->dev);
+	pm_runtime_set_suspended(&client->dev);
 
 	return 0;
 }
@@ -1374,10 +1475,10 @@ static const struct of_device_id imx363_dt_ids[] = {
 };
 MODULE_DEVICE_TABLE(of, imx363_dt_ids);
 
-// static const struct dev_pm_ops imx363_pm_ops = {
-// 	SET_SYSTEM_SLEEP_PM_OPS(imx363_suspend, imx363_resume)
-// 	SET_RUNTIME_PM_OPS(imx363_power_off, imx363_power_on, NULL)
-// };
+static const struct dev_pm_ops imx363_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(imx363_suspend, imx363_resume)
+	SET_RUNTIME_PM_OPS(imx363_power_off, imx363_power_on, NULL)
+};
 
 static struct i2c_driver imx363_i2c_driver = {
 	.driver = {
