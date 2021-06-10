@@ -46,6 +46,7 @@
 #define IMX363_REG_HDR_MODE				0x0220
 #define IMX363_REG_HDR_RESO_REDU_HHDR_RESO_REDU_V	0x0221
 
+// V-Timing controls
 #define IMX363_REG_FLL							0x0340
 #define IMX363_FLL_MAX							0xFFFF
 
@@ -159,12 +160,12 @@
 #define DUAL_PD_OUT_DISABLE 0x02
 
 /* IMX363 native and active pixel array size. */
-#define IMX363_NATIVE_WIDTH		3296U
-#define IMX363_NATIVE_HEIGHT		2480U
-#define IMX363_PIXEL_ARRAY_LEFT		8U
-#define IMX363_PIXEL_ARRAY_TOP		8U
-#define IMX363_PIXEL_ARRAY_WIDTH	3280U
-#define IMX363_PIXEL_ARRAY_HEIGHT	2464U
+// #define IMX363_NATIVE_WIDTH		3296U
+// #define IMX363_NATIVE_HEIGHT		2480U
+// #define IMX363_PIXEL_ARRAY_LEFT		8U
+// #define IMX363_PIXEL_ARRAY_TOP		8U
+// #define IMX363_PIXEL_ARRAY_WIDTH	3280U
+// #define IMX363_PIXEL_ARRAY_HEIGHT	2464U
 
 /* Calculate start and end address for simple centered crop */
 
@@ -215,7 +216,7 @@ struct imx363_mode {
 	unsigned int height;
 
 	/* Analog crop rectangle. */
-	struct v4l2_rect crop;
+	// struct v4l2_rect crop;
 
 	/* V-timing */
 	u32 fll_def;
@@ -428,12 +429,12 @@ static const struct imx363_mode supported_modes[] = {
 		/* 12.2MPix 30fps mode */
 		.width = 4032,
 		.height = 3024,
-		.crop = {
-			.left = 0,
-			.top = 0,
-			.width = 4032,
-			.height = 3024
-		},
+		// .crop = {
+		// 	.left = 0,
+		// 	.top = 0,
+		// 	.width = 4032,
+		// 	.height = 3024
+		// },
 		.fll_def = 3140,
 		.fll_min = 3140,
 		// .reg_list = {
@@ -601,7 +602,7 @@ static int imx363_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 	struct imx363 *imx363 = to_imx363(sd);
 	struct v4l2_mbus_framefmt *try_fmt =
 		v4l2_subdev_get_try_format(sd, fh->pad, 0);
-	struct v4l2_rect *try_crop;
+	// struct v4l2_rect *try_crop;
 
 	mutex_lock(&imx363->mutex);
 
@@ -613,11 +614,11 @@ static int imx363_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 	try_fmt->field = V4L2_FIELD_NONE;
 
 	/* Initialize try_crop rectangle. */
-	try_crop = v4l2_subdev_get_try_crop(sd, fh->pad, 0);
-	try_crop->top = IMX363_PIXEL_ARRAY_TOP;
-	try_crop->left = IMX363_PIXEL_ARRAY_LEFT;
-	try_crop->width = IMX363_PIXEL_ARRAY_WIDTH;
-	try_crop->height = IMX363_PIXEL_ARRAY_HEIGHT;
+	// try_crop = v4l2_subdev_get_try_crop(sd, fh->pad, 0);
+	// try_crop->top = IMX363_PIXEL_ARRAY_TOP;
+	// try_crop->left = IMX363_PIXEL_ARRAY_LEFT;
+	// try_crop->width = IMX363_PIXEL_ARRAY_WIDTH;
+	// try_crop->height = IMX363_PIXEL_ARRAY_HEIGHT;
 
 	mutex_unlock(&imx363->mutex);
 
@@ -860,55 +861,55 @@ static int imx363_set_framefmt(struct imx363 *imx363)
 	return -EINVAL;
 }
 
-static const struct v4l2_rect *
-__imx363_get_pad_crop(struct imx363 *imx363, struct v4l2_subdev_pad_config *cfg,
-		      unsigned int pad, enum v4l2_subdev_format_whence which)
-{
-	switch (which) {
-	case V4L2_SUBDEV_FORMAT_TRY:
-		return v4l2_subdev_get_try_crop(&imx363->sd, cfg, pad);
-	case V4L2_SUBDEV_FORMAT_ACTIVE:
-		return &imx363->mode->crop;
-	}
+// static const struct v4l2_rect *
+// __imx363_get_pad_crop(struct imx363 *imx363, struct v4l2_subdev_pad_config *cfg,
+// 		      unsigned int pad, enum v4l2_subdev_format_whence which)
+// {
+// 	switch (which) {
+// 	case V4L2_SUBDEV_FORMAT_TRY:
+// 		return v4l2_subdev_get_try_crop(&imx363->sd, cfg, pad);
+// 	case V4L2_SUBDEV_FORMAT_ACTIVE:
+// 		return &imx363->mode->crop;
+// 	}
 
-	return NULL;
-}
+// 	return NULL;
+// }
 
-static int imx363_get_selection(struct v4l2_subdev *sd,
-				struct v4l2_subdev_pad_config *cfg,
-				struct v4l2_subdev_selection *sel)
-{
-	switch (sel->target) {
-	case V4L2_SEL_TGT_CROP: {
-		struct imx363 *imx363 = to_imx363(sd);
+// static int imx363_get_selection(struct v4l2_subdev *sd,
+// 				struct v4l2_subdev_pad_config *cfg,
+// 				struct v4l2_subdev_selection *sel)
+// {
+// 	switch (sel->target) {
+// 	case V4L2_SEL_TGT_CROP: {
+// 		struct imx363 *imx363 = to_imx363(sd);
 
-		mutex_lock(&imx363->mutex);
-		sel->r = *__imx363_get_pad_crop(imx363, cfg, sel->pad,
-						sel->which);
-		mutex_unlock(&imx363->mutex);
+// 		mutex_lock(&imx363->mutex);
+// 		sel->r = *__imx363_get_pad_crop(imx363, cfg, sel->pad,
+// 						sel->which);
+// 		mutex_unlock(&imx363->mutex);
 
-		return 0;
-	}
+// 		return 0;
+// 	}
 
-	case V4L2_SEL_TGT_NATIVE_SIZE:
-		sel->r.top = 0;
-		sel->r.left = 0;
-		sel->r.width = IMX363_NATIVE_WIDTH;
-		sel->r.height = IMX363_NATIVE_HEIGHT;
+// 	case V4L2_SEL_TGT_NATIVE_SIZE:
+// 		sel->r.top = 0;
+// 		sel->r.left = 0;
+// 		sel->r.width = IMX363_NATIVE_WIDTH;
+// 		sel->r.height = IMX363_NATIVE_HEIGHT;
 
-		return 0;
+// 		return 0;
 
-	case V4L2_SEL_TGT_CROP_DEFAULT:
-		sel->r.top = IMX363_PIXEL_ARRAY_TOP;
-		sel->r.left = IMX363_PIXEL_ARRAY_LEFT;
-		sel->r.width = IMX363_PIXEL_ARRAY_WIDTH;
-		sel->r.height = IMX363_PIXEL_ARRAY_HEIGHT;
+// 	case V4L2_SEL_TGT_CROP_DEFAULT:
+// 		sel->r.top = IMX363_PIXEL_ARRAY_TOP;
+// 		sel->r.left = IMX363_PIXEL_ARRAY_LEFT;
+// 		sel->r.width = IMX363_PIXEL_ARRAY_WIDTH;
+// 		sel->r.height = IMX363_PIXEL_ARRAY_HEIGHT;
 
-		return 0;
-	}
+// 		return 0;
+// 	}
 
-	return -EINVAL;
-}
+// 	return -EINVAL;
+// }
 
 static int imx363_start_streaming(struct imx363 *imx363)
 {
@@ -1144,7 +1145,7 @@ static const struct v4l2_subdev_pad_ops imx363_pad_ops = {
 	.enum_mbus_code = imx363_enum_mbus_code,
 	.get_fmt = imx363_get_pad_format,
 	.set_fmt = imx363_set_pad_format,
-	.get_selection = imx363_get_selection,
+	// .get_selection = imx363_get_selection,
 	.enum_frame_size = imx363_enum_frame_size,
 };
 
@@ -1152,6 +1153,10 @@ static const struct v4l2_subdev_ops imx363_subdev_ops = {
 	.core = &imx363_core_ops,
 	.video = &imx363_video_ops,
 	.pad = &imx363_pad_ops,
+};
+
+static const struct media_entity_operations imx363_subdev_entity_ops = {
+	.link_validate = v4l2_subdev_link_validate,
 };
 
 static const struct v4l2_subdev_internal_ops imx363_internal_ops = {
@@ -1395,38 +1400,46 @@ static int imx363_probe(struct i2c_client *client)
 	if (!imx363)
     {
         dev_err(dev, "no mem\n");
-        // return -ENOMEM;
+        return -ENOMEM;
     }
+
+	dev_err(dev, "IMX TEST NUMBER - 3");
 	
 	v4l2_i2c_subdev_init(&imx363->sd, client, &imx363_subdev_ops);
 
 	/* Check the hardware configuration in device tree */
-	imx363_check_hwcfg(dev);
+	ret = imx363_check_hwcfg(dev);
+	if (ret) {
+		dev_err(dev, "failed to get hwcfg");
+		return ret;
+	}
 
 	/* Get system clock (xclk) */
 	imx363->xclk = devm_clk_get(dev, NULL);
 	if (IS_ERR(imx363->xclk)) {
 		dev_err(dev, "failed to get xclk\n");
-		// return PTR_ERR(imx363->xclk);
+		ret = PTR_ERR(imx363->xclk);
+		goto error_power_off;
 	}
 
 	ret = fwnode_property_read_u32(dev_fwnode(dev), "clock-frequency", &imx363->xclk_freq);
 	if (ret) {
 		dev_err(dev, "could not get xclk frequency\n");
-		// return ret;
+		goto error_power_off;
 	}
 
 	/* this driver currently expects 24MHz; allow 1% tolerance */
 	if (imx363->xclk_freq < 23760000 || imx363->xclk_freq > 24240000) {
 		dev_err(dev, "xclk frequency not supported: %d Hz\n",
 			imx363->xclk_freq);
-		// return -EINVAL;
+		ret = -EINVAL;
+		goto error_power_off;
 	}
 
 	ret = clk_set_rate(imx363->xclk, imx363->xclk_freq);
 	if (ret) {
 		dev_err(dev, "could not set xclk frequency\n");
-		// return ret;
+		goto error_power_off;
 	}
 
 
@@ -1447,12 +1460,12 @@ static int imx363_probe(struct i2c_client *client)
 	ret = imx363_power_on(dev);
 	if (ret){
         dev_err(dev, "failed to power on\n");
-        // return ret;
+        goto error_power_off;
     }
 
 	ret = imx363_identify_module(imx363);
-	// if (ret)
-	// 	goto error_power_off;
+	if (ret)
+		goto error_power_off;
 
     dev_info(dev, "probed successfully\n");
 	/* Set default mode to max resolution */
@@ -1481,7 +1494,9 @@ static int imx363_probe(struct i2c_client *client)
 
 	/* Initialize subdev */
 	imx363->sd.internal_ops = &imx363_internal_ops;
-	imx363->sd.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
+	imx363->sd.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE |
+		V4L2_SUBDEV_FL_HAS_EVENTS;
+	imx363->sd.entity.ops = &imx363_subdev_entity_ops;
 	imx363->sd.entity.function = MEDIA_ENT_F_CAM_SENSOR;
 
 	/* Initialize source pad */
