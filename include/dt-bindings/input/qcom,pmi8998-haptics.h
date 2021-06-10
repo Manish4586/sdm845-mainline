@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * This header provides constants for gpio keys bindings.
+ * This header provides constants for pmi8998 qpnp haptics options.
  */
 
 #ifndef _DT_BINDINGS_QCOM_PMIC_8998_HAPTICS_

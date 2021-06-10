@@ -4,7 +4,7 @@
 #
 
 # Each configuration option enables a list of files.
-
+ccflags := -DDYNAMIC_DEBUG_MODULE
 obj-$(CONFIG_INPUT_88PM860X_ONKEY)	+= 88pm860x_onkey.o
 obj-$(CONFIG_INPUT_88PM80X_ONKEY)	+= 88pm80x_onkey.o
 obj-$(CONFIG_INPUT_AB8500_PONKEY)	+= ab8500-ponkey.o
