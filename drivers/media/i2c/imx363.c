@@ -23,19 +23,12 @@
 
 /* External clock frequency is 24.0M */
 #define IMX363_XCLK_FREQ		24000000 //------------------------correct
-
 /* Half of per-lane speed in Mbps (DDR) */
 #define IMX363_DEFAULT_LINK_FREQ	504000000
-
 /* currently only 2-lane operation is supported */
 #define IMX363_NUM_LANES		4 //------------------------correct
-
-#define IMX363_VTS_MAX			0xffff
-#define IMX363_VTS_30FPS		0x06e3
-
 /* no clue why this is 10, but it is */
 #define IMX363_BITS_PER_SAMPLE		10
-
 /* Pixel rate is fixed at 364.8M for all the modes */
 #define IMX363_PIXEL_RATE		403200000 // (IMX363_DEFAULT_LINK_FREQ * 2 * IMX363_NUM_LANES / IMX363_BITS_PER_SAMPLE)
 
@@ -53,8 +46,9 @@
 #define IMX363_REG_HDR_MODE				0x0220
 #define IMX363_REG_HDR_RESO_REDU_HHDR_RESO_REDU_V	0x0221
 
-#define IMX363_REG_FRM_LENGTH_LINES_H			0x0340 //present in downstream, gets called many times, but always 0xC
-#define IMX363_REG_FRM_LENGTH_LINES_L			0x0341 //present in downstream
+#define IMX363_REG_FLL							0x0340
+#define IMX363_FLL_MAX							0xFFFF
+
 #define IMX363_REG_LINE_LENGTH_PCK_H			0x0342 //present in downstream
 #define IMX363_REG_LINE_LENGTH_PCK_L			0x0343 //present in downstream
 
@@ -136,12 +130,10 @@
 #define IMX363_PPL_DEFAULT		3448
 
 /* Analog gain control */
-
 #define IMX363_ANA_GAIN_MIN		0
 #define IMX363_ANA_GAIN_MAX		448
 #define IMX363_ANA_GAIN_STEP		1
 #define IMX363_ANA_GAIN_DEFAULT		0
-
 
 /* Exposure control */
 #define IMX363_EXPOSURE_MIN		4
@@ -150,20 +142,17 @@
 #define IMX363_EXPOSURE_MAX		65535
 
 /* Digital gain control */
-
 #define IMX363_DGTL_GAIN_MIN		256
 #define IMX363_DGTL_GAIN_MAX		4095
 #define IMX363_DGTL_GAIN_DEFAULT	256
 #define IMX363_DGTL_GAIN_STEP		1
 
 /* Binning types */
-
 #define IMX363_BINNING_NONE		0x00
 #define IMX363_BINNING_V2H2		0x22
 #define IMX363_BINNING_V2H4		0x42
 
 /* Data format to use for transmission */
-
 #define IMX363_CSI_DATA_FORMAT_RAW10	0x0A0A
 
 /* phase data */
@@ -179,17 +168,17 @@
 
 /* Calculate start and end address for simple centered crop */
 
-#define IMX363_READOUT_CROP_CENTER_START(readout_len, total_len)	((total_len - readout_len)/2)
-#define IMX363_READOUT_CROP_CENTER_END(readout_len, total_len)		((total_len - 1) - (total_len - readout_len)/2)
+// #define IMX363_READOUT_CROP_CENTER_START(readout_len, total_len)	((total_len - readout_len)/2)
+// #define IMX363_READOUT_CROP_CENTER_END(readout_len, total_len)		((total_len - 1) - (total_len - readout_len)/2)
 
-#define IMX363_READOUT_CROP_CENTER_LEFT(readout_width)		IMX363_READOUT_CROP_CENTER_START(readout_width, IMX363_PIXEL_ARRAY_WIDTH)
-#define IMX363_READOUT_CROP_CENTER_RIGHT(readout_width)		IMX363_READOUT_CROP_CENTER_END(readout_width, IMX363_PIXEL_ARRAY_WIDTH)
-#define IMX363_READOUT_CROP_CENTER_TOP(readout_height)		IMX363_READOUT_CROP_CENTER_START(readout_height, IMX363_PIXEL_ARRAY_HEIGHT)
-#define IMX363_READOUT_CROP_CENTER_BOTTOM(readout_height)	IMX363_READOUT_CROP_CENTER_END(readout_height, IMX363_PIXEL_ARRAY_HEIGHT)
+// #define IMX363_READOUT_CROP_CENTER_LEFT(readout_width)		IMX363_READOUT_CROP_CENTER_START(readout_width, IMX363_PIXEL_ARRAY_WIDTH)
+// #define IMX363_READOUT_CROP_CENTER_RIGHT(readout_width)		IMX363_READOUT_CROP_CENTER_END(readout_width, IMX363_PIXEL_ARRAY_WIDTH)
+// #define IMX363_READOUT_CROP_CENTER_TOP(readout_height)		IMX363_READOUT_CROP_CENTER_START(readout_height, IMX363_PIXEL_ARRAY_HEIGHT)
+// #define IMX363_READOUT_CROP_CENTER_BOTTOM(readout_height)	IMX363_READOUT_CROP_CENTER_END(readout_height, IMX363_PIXEL_ARRAY_HEIGHT)
 
 /* A macro to generate a register list for changing the mode */
 
-#define IMX363_MODE_REGS_GENERATE(readout_width, readout_height, pic_width, pic_height, binning)		\
+/* #define IMX363_MODE_REGS_GENERATE(readout_width, readout_height, pic_width, pic_height, binning)		\
 	{IMX363_REG_X_ADDR_START, IMX363_REG_VALUE_16BIT, IMX363_READOUT_CROP_CENTER_LEFT(readout_width)},	\
 	{IMX363_REG_X_ADDR_END, IMX363_REG_VALUE_16BIT, IMX363_READOUT_CROP_CENTER_RIGHT(readout_width)},	\
 	{IMX363_REG_Y_ADDR_START, IMX363_REG_VALUE_16BIT, IMX363_READOUT_CROP_CENTER_TOP(readout_height)},	\
@@ -202,9 +191,9 @@
 	{IMX363_REG_DIG_CROP_IMAGE_WIDTH, IMX363_REG_VALUE_16BIT, pic_width},					\
 	{IMX363_REG_DIG_CROP_IMAGE_HEIGHT, IMX363_REG_VALUE_16BIT, pic_height},					\
 														\
-	{IMX363_REG_BINNING_TYPE, IMX363_REG_VALUE_08BIT, binning},						\
+	{IMX363_REG_BINNING_TYPE, IMX363_REG_VALUE_08BIT, binning},			*/			
 
-//	{IMX363_REG_TP_WINDOW_WIDTH_HIG, IMX363_REG_VALUE_16BIT, pic_width},					\
+//	{IMX363_REG_TP_WINDOW_WIDTH_HIG, IMX363_REG_VALUE_16BIT, pic_width},
 //	{IMX363_REG_TP_WINDOW_HEIGHT_HIG, IMX363_REG_VALUE_16BIT, pic_height},
 
 struct imx363_reg {
@@ -229,7 +218,8 @@ struct imx363_mode {
 	struct v4l2_rect crop;
 
 	/* V-timing */
-	unsigned int vts_def;
+	u32 fll_def;
+	u32 fll_min;
 
 	/* Default register values */
 	struct imx363_reg_list reg_list;
@@ -266,9 +256,7 @@ static const struct imx363_reg setup_regs[] = {
 	{0x9354, IMX363_REG_VALUE_08BIT, 0xAA}, //------------------------correct
 
 	{IMX363_REG_CSI_DT_FMT, IMX363_REG_VALUE_16BIT, IMX363_CSI_DATA_FORMAT_RAW10}, //--------------correct
-
-	{IMX363_REG_FRM_LENGTH_LINES_H, IMX363_REG_VALUE_08BIT, 0x0C}, //----------------correct
-	{IMX363_REG_FRM_LENGTH_LINES_L, IMX363_REG_VALUE_08BIT, 0x44}, //----------------correct
+	{IMX363_REG_FLL, IMX363_REG_VALUE_16BIT, 0x0C44}, //----------------correct
 	{IMX363_REG_LINE_LENGTH_PCK_H, IMX363_REG_VALUE_08BIT, 0x22}, //----------------correct
 	{IMX363_REG_LINE_LENGTH_PCK_L, IMX363_REG_VALUE_08BIT, 0x80}, //----------------correct
 
@@ -446,11 +434,12 @@ static const struct imx363_mode supported_modes[] = {
 			.width = 4032,
 			.height = 3024
 		},
-		.vts_def = IMX363_VTS_30FPS,
-		.reg_list = {
-			.num_of_regs = ARRAY_SIZE(mode_4032x3024_regs),
-			.regs = mode_4032x3024_regs,
-		},
+		.fll_def = 3140,
+		.fll_min = 3140,
+		// .reg_list = {
+		// 	.num_of_regs = ARRAY_SIZE(mode_4032x3024_regs),
+		// 	.regs = mode_4032x3024_regs,
+		// },
 	},
 };
 
@@ -682,7 +671,7 @@ static int imx363_set_ctrl(struct v4l2_ctrl *ctrl)
 				       imx363->vflip->val << 1);
 		break;
 	case V4L2_CID_VBLANK:
-		ret = imx363_write_reg(imx363, IMX363_REG_FRM_LENGTH_LINES,
+		ret = imx363_write_reg(imx363, IMX363_REG_FLL,
 				       IMX363_REG_VALUE_16BIT,
 				       imx363->mode->height + ctrl->val);
 		break;
@@ -799,6 +788,9 @@ static int imx363_set_pad_format(struct v4l2_subdev *sd,
 	struct v4l2_mbus_framefmt *framefmt;
 	int exposure_max, exposure_def, hblank;
 	unsigned int i;
+	s32 vblank_def;
+	s32 vblank_min;
+	u32 height;
 
 	mutex_lock(&imx363->mutex);
 
@@ -824,13 +816,15 @@ static int imx363_set_pad_format(struct v4l2_subdev *sd,
 		imx363->fmt = fmt->format;
 		imx363->mode = mode;
 		/* Update limits and set FPS to default */
-		// __v4l2_ctrl_modify_range(imx363->vblank, IMX363_VBLANK_MIN,
-		// 			 IMX363_VTS_MAX - mode->height, 1,
-		// 			 mode->vts_def - mode->height);
-		__v4l2_ctrl_s_ctrl(imx363->vblank,
-				   mode->vts_def - mode->height);
+		height = mode->height;
+		vblank_def = mode->fll_def - mode->height;
+		vblank_min = mode->fll_min - mode->height;
+		height = IMX363_FLL_MAX - height;
+		__v4l2_ctrl_modify_range(imx363->vblank, vblank_min, mode->height, 1,
+					 vblank_def);
+		__v4l2_ctrl_s_ctrl(imx363->vblank, vblank_def);
 		/* Update max exposure while meeting expected vblanking */
-		exposure_max = mode->vts_def - 4;
+		exposure_max = mode->fll_def - 4;
 		exposure_def = (exposure_max < IMX363_EXPOSURE_DEFAULT) ?
 			exposure_max : IMX363_EXPOSURE_DEFAULT;
 		__v4l2_ctrl_modify_range(imx363->exposure,
@@ -1169,9 +1163,11 @@ static int imx363_init_controls(struct imx363 *imx363)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(&imx363->sd);
 	struct v4l2_ctrl_handler *ctrl_hdlr;
-	unsigned int height = imx363->mode->height;
 	struct v4l2_fwnode_device_properties props;
 	int exposure_max, exposure_def, hblank;
+	const struct imx363_mode *mode;
+	s64 vblank_def;
+	s64 vblank_min;
 	int ret;
 
 	ctrl_hdlr = &imx363->ctrl_handler;
@@ -1218,10 +1214,13 @@ static int imx363_init_controls(struct imx363 *imx363)
 	}
 
 	/* Initial vblank/hblank/exposure parameters based on current mode */
+	mode = imx363->mode;
+	vblank_def = mode->fll_def - mode->height;
+	vblank_min = mode->fll_min - mode->height;
 	imx363->vblank = v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops,
-					   V4L2_CID_VBLANK, IMX363_VBLANK_MIN,
-					   IMX363_VTS_MAX - height, 1,
-					   imx363->mode->vts_def - height);
+					   V4L2_CID_VBLANK, vblank_min,
+					   IMX363_FLL_MAX - mode->height,
+					   1, vblank_def);
 
 	if (ctrl_hdlr->error) {
 		ret = ctrl_hdlr->error;
@@ -1244,7 +1243,7 @@ static int imx363_init_controls(struct imx363 *imx363)
 		goto error;
 	}
 
-	exposure_max = imx363->mode->vts_def - 4;
+	exposure_max = mode->fll_def - 4;
 	exposure_def = (exposure_max < IMX363_EXPOSURE_DEFAULT) ?
 		exposure_max : IMX363_EXPOSURE_DEFAULT;
 	imx363->exposure = v4l2_ctrl_new_std(ctrl_hdlr, &imx363_ctrl_ops,
