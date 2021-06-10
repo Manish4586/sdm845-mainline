@@ -815,6 +815,7 @@
 			imx363_ep: endpoint {
 				clock-lanes = <1>;
 				data-lanes = <1 2 3 4>;
+				link-frequencies = /bits/ 64 <504000000>;
 				remote-endpoint = <&csiphy0_ep>;
 			};
 		};
