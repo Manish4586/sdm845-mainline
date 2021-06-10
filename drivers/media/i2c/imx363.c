@@ -25,19 +25,19 @@
 #define IMX363_XCLK_FREQ		24000000 //------------------------correct
 
 /* Half of per-lane speed in Mbps (DDR) */
-#define IMX363_DEFAULT_LINK_FREQ	456000000
+#define IMX363_DEFAULT_LINK_FREQ	504000000
 
 /* currently only 2-lane operation is supported */
 #define IMX363_NUM_LANES		4 //------------------------correct
 
 #define IMX363_VTS_MAX			0xffff
-#define IMX363_VTS_15FPS		0x0dc6
+#define IMX363_VTS_30FPS		0x06e3
 
 /* no clue why this is 10, but it is */
 #define IMX363_BITS_PER_SAMPLE		10
 
 /* Pixel rate is fixed at 364.8M for all the modes */
-#define IMX363_PIXEL_RATE		364800000 // (IMX363_DEFAULT_LINK_FREQ * 2 * IMX363_NUM_LANES / IMX363_BITS_PER_SAMPLE)
+#define IMX363_PIXEL_RATE		403200000 // (IMX363_DEFAULT_LINK_FREQ * 2 * IMX363_NUM_LANES / IMX363_BITS_PER_SAMPLE)
 
 /* Register map */
 
@@ -47,15 +47,16 @@
 
 #define IMX363_REG_EXCK_FREQ_H				0x0136 // integer part
 #define IMX363_REG_EXCK_FREQ_L				0x0137 // fractional part
-#define IMX363_REG_CSI_DT_FMT_H				0x0112
-#define IMX363_REG_CSI_DT_FMT_L				0x0113
+#define IMX363_REG_CSI_DT_FMT				0x0112 //16 bits
 #define IMX363_REG_CSI_LANE_MODE			0x0114
 
 #define IMX363_REG_HDR_MODE				0x0220
 #define IMX363_REG_HDR_RESO_REDU_HHDR_RESO_REDU_V	0x0221
 
-#define IMX363_REG_FRM_LENGTH_LINES			0x0340 // 16 bits //present in downstrea, gets called many times, but always 0xC
-#define IMX363_REG_LINE_LENGTH_PCK			0x0342 // 16 bits
+#define IMX363_REG_FRM_LENGTH_LINES_H			0x0340 //present in downstream, gets called many times, but always 0xC
+#define IMX363_REG_FRM_LENGTH_LINES_L			0x0341 //present in downstream
+#define IMX363_REG_LINE_LENGTH_PCK_H			0x0342 //present in downstream
+#define IMX363_REG_LINE_LENGTH_PCK_L			0x0343 //present in downstream
 
 #define IMX363_REG_X_EVN_INC				0x0381
 #define IMX363_REG_X_ODD_INC				0x0383
@@ -65,26 +66,38 @@
 #define IMX363_REG_BINNING_MODE				0x0900
 #define IMX363_REG_BINNING_TYPE				0x0901
 
-#define IMX363_REG_X_ADDR_START				0x0344 // 16 bits
-#define IMX363_REG_Y_ADDR_START				0x0346 // 16 bits
-#define IMX363_REG_X_ADDR_END				0x0348 // 16 bits
-#define IMX363_REG_Y_ADDR_END				0x034A // 16 bits
-#define IMX363_REG_X_OUT_SIZE				0x034C // 16 bits
-#define IMX363_REG_Y_OUT_SIZE				0x034E // 16 bits
+#define IMX363_REG_X_ADDR_START_H			0x0344 
+#define IMX363_REG_X_ADDR_START_L			0x0345 
+#define IMX363_REG_Y_ADDR_START_H			0x0346
+#define IMX363_REG_Y_ADDR_START_L			0x0347
+#define IMX363_REG_X_ADDR_END_H				0x0348
+#define IMX363_REG_X_ADDR_END_L				0x0349
+#define IMX363_REG_Y_ADDR_END_H				0x034A
+#define IMX363_REG_Y_ADDR_END_L				0x034B
+#define IMX363_REG_X_OUT_SIZE_H				0x034C
+#define IMX363_REG_X_OUT_SIZE_L				0x034D
+#define IMX363_REG_Y_OUT_SIZE_H				0x034E
+#define IMX363_REG_Y_OUT_SIZE_L				0x034F
 
-#define IMX363_REG_DIG_CROP_X_OFFSET			0x0408 // 16 bits
-#define IMX363_REG_DIG_CROP_Y_OFFSET			0x040A // 16 bits
-#define IMX363_REG_DIG_CROP_IMAGE_WIDTH			0x040C // 16 bits
-#define IMX363_REG_DIG_CROP_IMAGE_HEIGHT		0x040E // 16 bits
+#define IMX363_REG_DIG_CROP_X_OFFSET_H			0x0408
+#define IMX363_REG_DIG_CROP_X_OFFSET_L			0x0409
+#define IMX363_REG_DIG_CROP_Y_OFFSET_H			0x040A
+#define IMX363_REG_DIG_CROP_Y_OFFSET_L			0x040B
+#define IMX363_REG_DIG_CROP_IMAGE_WIDTH_H			0x040C
+#define IMX363_REG_DIG_CROP_IMAGE_WIDTH_L			0x040D
+#define IMX363_REG_DIG_CROP_IMAGE_HEIGHT_H		0x040E
+#define IMX363_REG_DIG_CROP_IMAGE_HEIGHT_L		0x040F
 
-#define IMX363_REG_IVTPXCK_DIV				0x0301
+#define IMX363_REG_IVTSXCK_DIV				0x0301
 #define IMX363_REG_IVTSYCK_DIV				0x0303
 #define IMX363_REG_PREPLLCK_IVT_DIV			0x0305
-#define IMX363_REG_PLL_IVT_MPY				0x0306 // 16 bits
+#define IMX363_REG_PLL_IVT_MPY_H			0x0306
+#define IMX363_REG_PLL_IVT_MPY_L			0x0307
 #define IMX363_REG_IOPPXCK_DIV				0x0309
 #define IMX363_REG_IOPSYCK_DIV				0x030B
 #define IMX363_REG_PREPLLCK_IOP_DIV			0x030D
-#define IMX363_REG_PLL_IOP_MPY				0x030E // 16 bits
+#define IMX363_REG_PLL_IOP_MPY_H			0x030E
+#define IMX363_REG_PLL_IOP_MPY_L			0x030F
 #define IMX363_REG_PLL_MULT_DRIV			0x0310
 
 #define IMX363_REG_COARSE_INTEG_TIME			0x0202 // 16 bits
@@ -127,20 +140,20 @@
 #define IMX363_ANA_GAIN_MIN		0
 #define IMX363_ANA_GAIN_MAX		448
 #define IMX363_ANA_GAIN_STEP		1
-#define IMX363_ANA_GAIN_DEFAULT		0x0
+#define IMX363_ANA_GAIN_DEFAULT		0
 
 
 /* Exposure control */
 #define IMX363_EXPOSURE_MIN		4
 #define IMX363_EXPOSURE_STEP		1
-#define IMX363_EXPOSURE_DEFAULT		0x640
+#define IMX363_EXPOSURE_DEFAULT		0x0640
 #define IMX363_EXPOSURE_MAX		65535
 
-/* Digital gain control */ // FIXME
+/* Digital gain control */
 
-#define IMX363_DGTL_GAIN_MIN		0x0100
-#define IMX363_DGTL_GAIN_MAX		0x0fff
-#define IMX363_DGTL_GAIN_DEFAULT	0x0100
+#define IMX363_DGTL_GAIN_MIN		256
+#define IMX363_DGTL_GAIN_MAX		4095
+#define IMX363_DGTL_GAIN_DEFAULT	256
 #define IMX363_DGTL_GAIN_STEP		1
 
 /* Binning types */
@@ -151,7 +164,7 @@
 
 /* Data format to use for transmission */
 
-#define IMX363_CSI_DATA_FORMAT_RAW10	0x0a0a
+#define IMX363_CSI_DATA_FORMAT_RAW10	0x0A0A
 
 /* phase data */
 #define DUAL_PD_OUT_DISABLE 0x02
@@ -224,68 +237,125 @@ struct imx363_mode {
 
 static const struct imx363_reg setup_regs[] = {
 	{IMX363_REG_MODE_SELECT, IMX363_REG_VALUE_08BIT, IMX363_MODE_STANDBY}, // standby //------------------------correct
-
 	{IMX363_REG_CSI_LANE_MODE, IMX363_REG_VALUE_08BIT, IMX363_CSI_LANE_NUM_4}, //------------------------correct
+	{IMX363_REG_EXCK_FREQ_H, IMX363_REG_VALUE_08BIT, 0x18}, // 24.00 Mhz = 18.00h //------------------------correct
+	{IMX363_REG_EXCK_FREQ_L, IMX363_REG_VALUE_08BIT, 0x00}, // 24.00 Mhz = 18.00h //------------------------correct
 
-	{IMX363_REG_DPHY_CTRL, IMX363_REG_VALUE_08BIT, IMX363_DPHY_CTRL_AUTO}, //------------NA
-
-	{IMX363_REG_EXCK_FREQ_H, IMX363_REG_VALUE_16BIT, 0x1800}, // 24.00 Mhz = 18.00h //------------------------correct
-
-//	{IMX363_REG_LINE_LENGTH_PCK, IMX363_REG_VALUE_16BIT, 0x2200},
-
-//	{IMX363_REG_X_ODD_INC, IMX363_REG_VALUE_08BIT, 0x01},
-//	{IMX363_REG_Y_ODD_INC, IMX363_REG_VALUE_08BIT, 0x01},
-
-	// {IMX363_REG_HDR_MODE, IMX363_REG_VALUE_8BIT, 0x00}
-	// {IMX363_REG_DUAL_PD_OUT_MODE, IMX363_REG_VALUE_8BIT, DUAL_PD_OUT_DISABLE}
-
-	// {IMX363_REG_IVTPXCK_DIV, IMX363_REG_VALUE_8BIT, 3}
-	// {IMX363_REG_IVTSYCK_DIV, IMX363_REG_VALUE_8BIT, 2}
-	{IMX363_REG_PREPLLCK_IVT_DIV, IMX363_REG_VALUE_08BIT, 4}, //---------NA
-	{IMX363_REG_PLL_IVT_MPY, IMX363_REG_VALUE_16BIT, 210}, //---------NA
-	{IMX363_REG_IOPPXCK_DIV, IMX363_REG_VALUE_08BIT, 10}, //---------NA
-	{IMX363_REG_IOPSYCK_DIV, IMX363_REG_VALUE_08BIT, 1}, //---------NA
-	{IMX363_REG_PREPLLCK_IOP_DIV, IMX363_REG_VALUE_08BIT, 4}, //------------------------correct
-	{IMX363_REG_PLL_IOP_MPY, IMX363_REG_VALUE_16BIT, 0}, //------------------------correct
-	{IMX363_REG_PLL_MULT_DRIV, IMX363_REG_VALUE_08BIT, 1}, //true //------------------------correct
-
-	// magic default value updates - TODO: is this needed?
+	//Magical Regs & Values - 1
 	{0x31A3, IMX363_REG_VALUE_08BIT, 0x00}, //------------------------correct
 	{0x64D4, IMX363_REG_VALUE_08BIT, 0x01}, //------------------------correct
-	{0x64D5, IMX363_REG_VALUE_08BIT, 0xAA}, //---------NA
+	{0x64D5, IMX363_REG_VALUE_08BIT, 0xAA}, //------------------------correct
 	{0x64D6, IMX363_REG_VALUE_08BIT, 0x01}, //------------------------correct
 	{0x64D7, IMX363_REG_VALUE_08BIT, 0xA9}, //------------------------correct
-	{0x64D8, IMX363_REG_VALUE_08BIT, 0x01}, //---------NA
+	{0x64D8, IMX363_REG_VALUE_08BIT, 0x01}, //------------------------correct
 	{0x64D9, IMX363_REG_VALUE_08BIT, 0xA5}, //------------------------correct
 	{0x64DA, IMX363_REG_VALUE_08BIT, 0x01}, //------------------------correct
-	{0x64DB, IMX363_REG_VALUE_08BIT, 0xA1}, //---------NA
+	{0x64DB, IMX363_REG_VALUE_08BIT, 0xA1}, //------------------------correct
 	{0x720A, IMX363_REG_VALUE_08BIT, 0x24}, //------------------------correct
-	{0x720B, IMX363_REG_VALUE_08BIT, 0x89}, //---------NA
+	{0x720B, IMX363_REG_VALUE_08BIT, 0x89}, //------------------------correct
 	{0x720C, IMX363_REG_VALUE_08BIT, 0x85}, //------------------------correct
-	{0x720D, IMX363_REG_VALUE_08BIT, 0xA1}, //---------NA
+	{0x720D, IMX363_REG_VALUE_08BIT, 0xA1}, //------------------------correct
 	{0x720E, IMX363_REG_VALUE_08BIT, 0x6E}, //------------------------correct
 	{0x729C, IMX363_REG_VALUE_08BIT, 0x59}, //------------------------correct
 	{0x817C, IMX363_REG_VALUE_08BIT, 0xFF}, //------------------------correct
 	{0x817D, IMX363_REG_VALUE_08BIT, 0x80}, //------------------------correct
-	{0x9348, IMX363_REG_VALUE_08BIT, 0x96}, //---------NA
+	{0x9348, IMX363_REG_VALUE_08BIT, 0x96}, //------------------------correct
 	{0x934B, IMX363_REG_VALUE_08BIT, 0x8C}, //------------------------correct
 	{0x934C, IMX363_REG_VALUE_08BIT, 0x82}, //------------------------correct
 	{0x9353, IMX363_REG_VALUE_08BIT, 0xAA}, //------------------------correct
-	{0x9354, IMX363_REG_VALUE_08BIT, 0xAA}, //---------NA
+	{0x9354, IMX363_REG_VALUE_08BIT, 0xAA}, //------------------------correct
 
-	{IMX363_REG_CSI_DT_FMT_L, IMX363_REG_VALUE_08BIT, 0xA0}, //------------------------correct
-	{IMX363_REG_ST_COARSE_INTEG_TIME, IMX363_REG_VALUE_08BIT, 0x01}, //------------------------present in downstream, 1 time
-	{0x30F, IMX363_REG_VALUE_08BIT, 0xDD}, //------------------------dont know, present in downstream, 1 time
-	{0x225, IMX363_REG_VALUE_08BIT, 0xF4}, //------------------------dont know, present in downstream, 1 time
-	{0x227, IMX363_REG_VALUE_08BIT, 0x00}, //------------------------dont know, present in downstream, 1 time
-	{0x2, IMX363_REG_VALUE_08BIT, 0x00}, //------------------------dont know, present in downstream, 1 time
-	{0x341, IMX363_REG_VALUE_08BIT, 0x62}, //------------------------dont know, present in downstream, many times but always 0x62
-	{0x3008, IMX363_REG_VALUE_08BIT, 0x00}, //------------------------dont know, present in downstream, many times but always 0x00
-	{0x0, IMX363_REG_VALUE_16BIT, 0x5c40}, //------------------------dont know, present in downstream, 1 time
-	// 0x203 - dont know, present in downstream, value keeps changing when streaming
-	// 0x205 - dont know, present in downstream, value keeps changing when streaming
+	{IMX363_REG_CSI_DT_FMT, IMX363_REG_VALUE_16BIT, IMX363_CSI_DATA_FORMAT_RAW10}, //--------------correct
+
+	{IMX363_REG_FRM_LENGTH_LINES_H, IMX363_REG_VALUE_08BIT, 0x0C}, //----------------correct
+	{IMX363_REG_FRM_LENGTH_LINES_L, IMX363_REG_VALUE_08BIT, 0x44}, //----------------correct
+	{IMX363_REG_LINE_LENGTH_PCK_H, IMX363_REG_VALUE_08BIT, 0x22}, //----------------correct
+	{IMX363_REG_LINE_LENGTH_PCK_L, IMX363_REG_VALUE_08BIT, 0x80}, //----------------correct
+
+	{IMX363_REG_X_EVN_INC, IMX363_REG_VALUE_08BIT, 0x01}, //----------------correct
+	{IMX363_REG_X_ODD_INC, IMX363_REG_VALUE_08BIT, 0x01}, //----------------correct
+	{IMX363_REG_Y_EVN_INC, IMX363_REG_VALUE_08BIT, 0x01}, //----------------correct
+	{IMX363_REG_Y_ODD_INC, IMX363_REG_VALUE_08BIT, 0x01}, //----------------correct
+	{IMX363_REG_BINNING_MODE, IMX363_REG_VALUE_08BIT, 0x00}, //-------------correct
+	{IMX363_REG_BINNING_TYPE, IMX363_REG_VALUE_08BIT, 0x11}, //-------------correct
+
+	//Magical Regs & Values - 2
+	{0x30F4, IMX363_REG_VALUE_08BIT, 0x02}, //------------------------correct
+	{0x30F5, IMX363_REG_VALUE_08BIT, 0x80}, //------------------------correct
+	{0x31A5, IMX363_REG_VALUE_08BIT, 0x00}, //------------------------correct
+	{0x31A6, IMX363_REG_VALUE_08BIT, 0x00}, //------------------------correct
+	{0x560F, IMX363_REG_VALUE_08BIT, 0xBE}, //------------------------correct
+	{0x5856, IMX363_REG_VALUE_08BIT, 0x08}, //------------------------correct
+	{0x58D0, IMX363_REG_VALUE_08BIT, 0x10}, //------------------------correct
+	{0x734A, IMX363_REG_VALUE_08BIT, 0x01}, //------------------------correct
+	{0x734F, IMX363_REG_VALUE_08BIT, 0x2B}, //------------------------correct
+	{0x7441, IMX363_REG_VALUE_08BIT, 0x55}, //------------------------correct
+	{0x7914, IMX363_REG_VALUE_08BIT, 0x03}, //------------------------correct
+	{0x7928, IMX363_REG_VALUE_08BIT, 0x04}, //------------------------correct
+	{0x7929, IMX363_REG_VALUE_08BIT, 0x04}, //------------------------correct
+	{0x793F, IMX363_REG_VALUE_08BIT, 0x03}, //------------------------correct
+	{0xBC7B, IMX363_REG_VALUE_08BIT, 0x18}, //------------------------correct, 1st run not present, 2nd run present, not sure if needed
+
+	{IMX363_REG_X_ADDR_START_H, IMX363_REG_VALUE_08BIT, 0x00}, //-------------correct
+	{IMX363_REG_X_ADDR_START_L, IMX363_REG_VALUE_08BIT, 0x00}, //-------------correct
+	{IMX363_REG_Y_ADDR_START_H, IMX363_REG_VALUE_08BIT, 0x00}, //-------------correct
+	{IMX363_REG_Y_ADDR_START_L, IMX363_REG_VALUE_08BIT, 0x00}, //-------------correct
+	// Start = (0,0)
+	{IMX363_REG_X_ADDR_END_H, IMX363_REG_VALUE_08BIT, 0x0F}, //-------------correct
+	{IMX363_REG_X_ADDR_END_L, IMX363_REG_VALUE_08BIT, 0xBF}, //-------------correct
+	{IMX363_REG_Y_ADDR_END_H, IMX363_REG_VALUE_08BIT, 0x0B}, //-------------correct
+	{IMX363_REG_Y_ADDR_END_L, IMX363_REG_VALUE_08BIT, 0xCF}, //-------------NA, 
+	// assuming 0xCF. Since X pixel ends at 4031 (0x0FBF). then its obvious Y pixel ends at 3023 (0x0BCF)
+	// End = (4031,3023)
+	{IMX363_REG_X_OUT_SIZE_H, IMX363_REG_VALUE_08BIT, 0x0F}, //-------------correct
+	{IMX363_REG_X_OUT_SIZE_L, IMX363_REG_VALUE_08BIT, 0xC0}, //-------------NA, 
+	// assuming 0xCF. Since X pixel size is 4032 (0x0FC0)
+	{IMX363_REG_Y_OUT_SIZE_H, IMX363_REG_VALUE_08BIT, 0x0B}, //-------------correct
+	{IMX363_REG_Y_OUT_SIZE_L, IMX363_REG_VALUE_08BIT, 0xD0}, //-------------NA, 
+	// assuming 0xD0. Since Y pixel size is 3024 (0x0BD0)
+	{IMX363_REG_DIG_CROP_X_OFFSET_H, IMX363_REG_VALUE_08BIT, 0x00}, //-------------correct
+	{IMX363_REG_DIG_CROP_X_OFFSET_L, IMX363_REG_VALUE_08BIT, 0x00}, //-------------correct
+	{IMX363_REG_DIG_CROP_Y_OFFSET_H, IMX363_REG_VALUE_08BIT, 0x00}, //-------------correct
+	{IMX363_REG_DIG_CROP_Y_OFFSET_L, IMX363_REG_VALUE_08BIT, 0x00}, //-------------correct
+	{IMX363_REG_DIG_CROP_IMAGE_WIDTH_H, IMX363_REG_VALUE_08BIT, 0x0F}, //-------------correct
+	{IMX363_REG_DIG_CROP_IMAGE_WIDTH_L, IMX363_REG_VALUE_08BIT, 0xC0}, //-------------correct
+	{IMX363_REG_DIG_CROP_IMAGE_HEIGHT_H, IMX363_REG_VALUE_08BIT, 0x0B}, //-------------correct
+	{IMX363_REG_DIG_CROP_IMAGE_HEIGHT_L, IMX363_REG_VALUE_08BIT, 0xD0}, //-------------correct
+	
+	{IMX363_REG_IVTSXCK_DIV, IMX363_REG_VALUE_08BIT, 0x03}, //-------------correct
+	{IMX363_REG_IVTSYCK_DIV, IMX363_REG_VALUE_08BIT, 0x02}, //-------------correct
+	{IMX363_REG_PREPLLCK_IVT_DIV, IMX363_REG_VALUE_08BIT, 0x04}, //-----------correct
+	{IMX363_REG_PLL_IVT_MPY_H, IMX363_REG_VALUE_08BIT, 0x00}, //-----------correct
+	{IMX363_REG_PLL_IVT_MPY_L, IMX363_REG_VALUE_08BIT, 0xD0}, //-----------correct
+	{IMX363_REG_IOPPXCK_DIV, IMX363_REG_VALUE_08BIT, 0x0A}, //-----------correct
+	{IMX363_REG_IOPSYCK_DIV, IMX363_REG_VALUE_08BIT, 0x01}, //-----------correct
+	{IMX363_REG_PREPLLCK_IOP_DIV, IMX363_REG_VALUE_08BIT, 0x04}, //------correct
+	{IMX363_REG_PLL_IOP_MPY_H, IMX363_REG_VALUE_08BIT, 0x00}, //------------correct
+	{IMX363_REG_PLL_IOP_MPY_L, IMX363_REG_VALUE_08BIT, 0xE6}, //-------------correct
+	{IMX363_REG_PLL_MULT_DRIV, IMX363_REG_VALUE_08BIT, 0x01}, //-------------correct
+
+	{IMX363_REG_COARSE_INTEG_TIME, IMX363_REG_VALUE_16BIT, IMX363_EXPOSURE_DEFAULT}, //-------------correct
+	{IMX363_REG_ST_COARSE_INTEG_TIME, IMX363_REG_VALUE_16BIT, 0x01F4}, //-------------correct
+	{IMX363_REG_ANA_GAIN_GLOBAL, IMX363_REG_VALUE_16BIT, 0x0000}, //-------------correct
+	{IMX363_REG_ST_ANA_GAIN_GLOBAL, IMX363_REG_VALUE_16BIT, 0x0000}, //-------------correct
+	{IMX363_REG_DIG_GAIN_GLOBAL, IMX363_REG_VALUE_16BIT, 0x0100}, //-------------correct
+	{IMX363_REG_ST_DIG_GAIN_GLOBAL, IMX363_REG_VALUE_16BIT, 0x0100}, //-------------correct
+
+
+	{IMX363_REG_HDR_MODE, IMX363_REG_VALUE_08BIT, 0x00}, //--------------------correct
+	{IMX363_REG_HDR_RESO_REDU_HHDR_RESO_REDU_V, IMX363_REG_VALUE_08BIT, 0x11}, //--------------------correct
+	{IMX363_REG_DPHY_CTRL, IMX363_REG_VALUE_08BIT, IMX363_DPHY_CTRL_AUTO}, //------------NA in downstream. not even sure if this is valid address. its not present in imx319 too. hopefully this is not needed and its automatically in this mode or whatever.
+
+	// I think some of these values below are related to camera actuator or something??
+	// {0x2, IMX363_REG_VALUE_08BIT, 0x00}, //------------------------dont know, present in downstream, 1 time
+	// {0x3008, IMX363_REG_VALUE_08BIT, 0x00}, //------------------------dont know, present in downstream, many times but always 0x00
+	// {0x0, IMX363_REG_VALUE_16BIT, 0x5c40}, //------------------------dont know, present in downstream, 1 time
 	// 0x104 - dont know, present in downstream, value keeps changing btw 0 and 1 when streaming
-	// 0x20F - dont know, present in downstream, value mostly 0 but in btw changed to 0x14,0x10,0x4 once and then back to 0
+	// whenever stream is stopped in downstream, there is this sequence below. noting it here for reference
+	// CAM_DBG: CAM-CCI: cam_cci_data_queue: 741: cmd_size 1 addr 0x0 data 0x3940
+	// CAM_DBG: CAM-CCI: cam_cci_data_queue: 741: cmd_size 1 addr 0x0 data 0x740
+	// CAM_DBG: CAM-CCI: cam_cci_data_queue: 741: cmd_size 1 addr 0x0 data 0x240
+	// CAM_DBG: CAM-CCI: cam_cci_data_queue: 741: cmd_size 1 addr 0x0 data 0x0
 };
 
 static const struct imx363_reg_list setup_reg_list = {
@@ -293,13 +363,13 @@ static const struct imx363_reg_list setup_reg_list = {
 	.regs = setup_regs,
 };
 
-static const struct imx363_reg mode_4032x3024_regs[] = {
-	IMX363_MODE_REGS_GENERATE(4032, 3024, 4032, 3024, IMX363_BINNING_NONE)
-};
+// static const struct imx363_reg mode_4032x3024_regs[] = {
+// 	IMX363_MODE_REGS_GENERATE(4032, 3024, 4032, 3024, IMX363_BINNING_NONE)
+// };
 
 static const struct imx363_reg raw10_framefmt_regs[] = {
-	// {IMX363_REG_CSI_DATA_FORMAT_A_HIG, IMX363_REG_VALUE_16BIT, IMX363_CSI_DATA_FORMAT_RAW10},
-	// {IMX363_REG_OPPXCK_DIV, IMX363_REG_VALUE_08BIT, 0x0a},
+	{IMX363_REG_CSI_DT_FMT, IMX363_REG_VALUE_16BIT, IMX363_CSI_DATA_FORMAT_RAW10},
+	{IMX363_REG_IOPPXCK_DIV, IMX363_REG_VALUE_08BIT, 0x0A},
 };
 
 static const s64 imx363_link_freq_menu[] = {
@@ -367,7 +437,7 @@ static const u32 codes[] = {
 /* Mode configs */
 static const struct imx363_mode supported_modes[] = {
 	{
-		/* 8MPix 15fps mode */
+		/* 12.2MPix 30fps mode */
 		.width = 4032,
 		.height = 3024,
 		.crop = {
@@ -376,7 +446,7 @@ static const struct imx363_mode supported_modes[] = {
 			.width = 4032,
 			.height = 3024
 		},
-		.vts_def = IMX363_VTS_15FPS,
+		.vts_def = IMX363_VTS_30FPS,
 		.reg_list = {
 			.num_of_regs = ARRAY_SIZE(mode_4032x3024_regs),
 			.regs = mode_4032x3024_regs,
@@ -861,12 +931,12 @@ static int imx363_start_streaming(struct imx363 *imx363)
 	}
 
 	/* Set up registers according to current mode */
-	reg_list = &imx363->mode->reg_list;
-	ret = imx363_write_regs(imx363, reg_list->regs, reg_list->num_of_regs);
-	if (ret) {
-		dev_err(&client->dev, "%s failed to set mode\n", __func__);
-		return ret;
-	}
+	// reg_list = &imx363->mode->reg_list;
+	// ret = imx363_write_regs(imx363, reg_list->regs, reg_list->num_of_regs);
+	// if (ret) {
+	// 	dev_err(&client->dev, "%s failed to set mode\n", __func__);
+	// 	return ret;
+	// }
 
 	ret = imx363_set_framefmt(imx363);
 	if (ret) {
