@@ -2196,27 +2196,6 @@ static void wcd934x_hw_init(struct wcd934x_codec *wcd)
 
 	/* Take DMICs out of reset */
 	regmap_update_bits(rm, WCD934X_CPE_SS_DMIC_CFG, 0x80, 0x00);
-
-	// Enable jack detection
-	regmap_update_bits(rm, WCD934X_ANA_MBHC_MECH, 0x80, 0x80); //WCD_MBHC_L_DET_EN
-	// Maybe not needed?? set in "tavil_mbhc_gnd_det_ctrl"
-	//regmap_update_bits(rm, WCD934X_ANA_MBHC_MECH, 0x02, 0x02);
-	
-	regmap_update_bits(rm, WCD934X_ANA_MBHC_MECH, 0x40, 0x40); //WCD_MBHC_GND_DET_EN
-	regmap_update_bits(rm, WCD934X_ANA_MBHC_MECH, 0x20, 0x20); //WCD_MBHC_MECH_DETECTION_TYPE
-	regmap_update_bits(rm, WCD934X_MBHC_NEW_PLUG_DETECT_CTL, 0x30, (1 << 4)); //WCD_MBHC_MIC_CLAMP_CTL
-	regmap_update_bits(rm, WCD934X_ANA_MBHC_ELECT, 0x08, 0x08); //WCD_MBHC_ELECT_DETECTION_TYPE
-	regmap_update_bits(rm, WCD934X_MBHC_NEW_PLUG_DETECT_CTL, 0xC0, (1 << 6)); //WCD_MBHC_HS_L_DET_PULL_UP_CTRL
-	regmap_update_bits(rm, WCD934X_ANA_MBHC_MECH, 0x04, 0x04); //WCD_MBHC_HS_L_DET_PULL_UP_COMP_CTRL
-	regmap_update_bits(rm, WCD934X_ANA_MBHC_MECH, 0x10, 0x10); //WCD_MBHC_HPHL_PLUG_TYPE
-	regmap_update_bits(rm, WCD934X_ANA_MBHC_MECH, 0x08, 0x08); //WCD_MBHC_GND_PLUG_TYPE
-	regmap_update_bits(rm, WCD934X_ANA_MBHC_MECH, 0x01, 0x01); //WCD_MBHC_SW_HPH_LP_100K_TO_GND
-	regmap_update_bits(rm, WCD934X_MBHC_NEW_PLUG_DETECT_CTL, 0x0F, 0x00); //WCD_MBHC_SW_HPH_LP_100K_TO_GND
-	//...
-	regmap_update_bits(rm, WCD934X_MBHC_NEW_CTL_1, 0x08, 0x08); //WCD_MBHC_ADC_EN
-	regmap_update_bits(rm, WCD934X_MBHC_NEW_CTL_1, 0x10, 0x10); //WCD_MBHC_ADC_MODE
-	regmap_update_bits(rm, WCD934X_MBHC_NEW_CTL_1, 0x04, 0x04); //WCD_MBHC_DETECTION_DONE
-	regmap_update_bits(rm, WCD934X_ANA_MBHC_ZDET, 0x02, 0x02); //WCD_MBHC_ELECT_ISRC_EN
 }
 
 static int wcd934x_comp_init(struct snd_soc_component *component)
@@ -2239,8 +2218,6 @@ static irqreturn_t wcd934x_slim_irq_handler(int irq, void *data)
 	irqreturn_t ret = IRQ_NONE;
 	bool tx;
 	unsigned short reg = 0;
-
-	pr_info("wcd934x IRQ !!!");
 
 	for (i = WCD934X_SLIM_PGD_PORT_INT_STATUS_RX_0, j = 0;
 	     i <= WCD934X_SLIM_PGD_PORT_INT_STATUS_TX_1; i++, j++) {
