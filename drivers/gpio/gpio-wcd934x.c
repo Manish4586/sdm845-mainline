@@ -72,6 +72,39 @@ static void wcd_gpio_set(struct gpio_chip *chip, unsigned int pin, int val)
 			   WCD_PIN_MASK(pin), val ? WCD_PIN_MASK(pin) : 0);
 }
 
+#ifdef CONFIG_DEBUG_FS
+#include <linux/seq_file.h>
+
+static void wcd_gpio_dbg_show_one(struct seq_file *s,
+				  struct gpio_chip *chip,
+				  unsigned pin)
+{
+	struct wcd_gpio_data *data = gpiochip_get_data(chip);
+	unsigned func;
+	int is_out;
+	int drive;
+	int pull;
+	int val;
+
+	is_out = !wcd_gpio_get_direction(chip, pin);
+	val = wcd_gpio_get(chip, pin);
+
+	seq_printf(s, " %-1s: %-3s", pin, is_out ? "out" : "in");
+	seq_printf(s, " %-4s", val ? "high" : "low");
+	seq_puts(s, "\n");
+}
+
+static void wcd_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+{
+	unsigned i;
+
+	for (i = 0; i < chip->ngpio; i++)
+		wcd_gpio_dbg_show_one(s, chip, i);
+}
+#else
+#define wcd_gpio_dbg_show NULL
+#endif
+
 static int wcd_gpio_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -100,6 +133,7 @@ static int wcd_gpio_probe(struct platform_device *pdev)
 	chip->label = dev_name(dev);
 	chip->of_gpio_n_cells = 2;
 	chip->can_sleep = false;
+	chip->dbg_show = wcd_gpio_dbg_show;
 
 	return devm_gpiochip_add_data(dev, chip, data);
 }
