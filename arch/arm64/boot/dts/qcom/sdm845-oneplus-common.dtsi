@@ -30,7 +30,7 @@
 		stdout-path = "serial0:115200n8";
 	};
 
-gpio-keys {
+	gpio-keys {
 		compatible = "gpio-keys";
 		label = "Volume keys";
 		autorepeat;
@@ -52,6 +52,20 @@ gpio-keys {
 			debounce-interval = <15>;
 		};
 	};
+
+	// headphone-jack {
+	// 	compatible = "gpio-keys";
+	// 	label = "Headphone Jack GPIOs";
+
+	// 	pinctrl-names = "default";
+	// 	pinctrl-0 = <&wcd934_gpios>;
+
+	// 	pin-0 {
+	// 		label = "Pin 0";
+	// 		linux,code = <KEY_A>;
+	// 		gpios = <&wcdgpio 1 GPIO_ACTIVE_LOW>;
+	// 	}
+	// }
 
 	reserved-memory {
 		/* The rmtfs_mem needs to be guarded due to "XPU limitations"
