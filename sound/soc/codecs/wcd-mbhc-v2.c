@@ -1394,29 +1394,37 @@ struct wcd_mbhc *wcd_mbhc_init(struct snd_soc_component *component,
 					wcd_mbhc_mech_plug_detect_irq,
 					IRQF_ONESHOT | IRQF_TRIGGER_RISING,
 					"mbhc sw intr", mbhc);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "failed to request interrupt: %s", "mbhc sw intr");
 		goto err;
+	}
 
 	ret = devm_request_threaded_irq(dev, mbhc->intr_ids->mbhc_btn_press_intr, NULL,
 					wcd_mbhc_btn_press_handler,
 					IRQF_ONESHOT | IRQF_TRIGGER_RISING,
 					"Button Press detect", mbhc);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "failed to request interrupt: %s", "Button Press detect");
 		goto err;
+	}
 
 	ret = devm_request_threaded_irq(dev, mbhc->intr_ids->mbhc_btn_release_intr, NULL,
 					wcd_mbhc_btn_release_handler,
 					IRQF_ONESHOT | IRQF_TRIGGER_RISING,
 					"Button Release detect", mbhc);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "failed to request interrupt: %s", "Button Release detect");
 		goto err;
+	}
 
 	ret = devm_request_threaded_irq(dev, mbhc->intr_ids->mbhc_hs_ins_intr, NULL,
 					wcd_mbhc_adc_hs_ins_irq,
 					IRQF_ONESHOT | IRQF_TRIGGER_RISING,
 					"Elect Insert", mbhc);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "failed to request interrupt: %s", "Elect Insert");
 		goto err;
+	}
 
 	disable_irq_nosync(mbhc->intr_ids->mbhc_hs_ins_intr);
 
@@ -1424,8 +1432,10 @@ struct wcd_mbhc *wcd_mbhc_init(struct snd_soc_component *component,
 					wcd_mbhc_adc_hs_rem_irq,
 					IRQF_ONESHOT | IRQF_TRIGGER_RISING,
 					"Elect Remove", mbhc);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "failed to request interrupt: %s", "Elect Remove");
 		goto err;
+	}
 
 	disable_irq_nosync(mbhc->intr_ids->mbhc_hs_rem_intr);
 
@@ -1433,15 +1443,19 @@ struct wcd_mbhc *wcd_mbhc_init(struct snd_soc_component *component,
 					wcd_mbhc_hphl_ocp_irq,
 					IRQF_ONESHOT | IRQF_TRIGGER_RISING,
 					"HPH_L OCP detect", mbhc);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "failed to request interrupt: %s", "HPH_L OCP detect");
 		goto err;
+	}
 
 	ret = devm_request_threaded_irq(dev, mbhc->intr_ids->hph_right_ocp, NULL,
 					wcd_mbhc_hphr_ocp_irq,
 					IRQF_ONESHOT | IRQF_TRIGGER_RISING,
 					"HPH_R OCP detect", mbhc);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "failed to request interrupt: %s", "HPH_R OCP detect");
 		goto err;
+	}
 
 	return mbhc;
 err:

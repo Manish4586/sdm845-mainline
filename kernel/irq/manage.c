@@ -2101,16 +2101,23 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
 	desc = irq_to_desc(irq);
 	if (!desc)
 		return -EINVAL;
+	
+	pr_info("IRQ: %d, %s: Got IRQ desc", irq, devname);
 
 	if (!irq_settings_can_request(desc) ||
 	    WARN_ON(irq_settings_is_per_cpu_devid(desc)))
-		return -EINVAL;
+		irq_settings_clr_norequest(desc);
+		//return -EINVAL;
+	
+	pr_info("IRQ: %d, %s: irq setting can request", irq, devname);
 
 	if (!handler) {
 		if (!thread_fn)
 			return -EINVAL;
 		handler = irq_default_primary_handler;
 	}
+
+	pr_info("IRQ: %d, %s: have handler", irq, devname);
 
 	action = kzalloc(sizeof(struct irqaction), GFP_KERNEL);
 	if (!action)
