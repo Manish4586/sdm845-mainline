@@ -313,6 +313,11 @@
 	};
 };
 
+&pmi8998_haptics {
+	status = "okay";
+	qcom,wave-play-rate-us = <4878>;
+};
+
 /* QUAT I2S Uses 1 I2S SD Line for audio on TAS2559/60 amplifiers */
 &q6afedai {
 	qi2s@22 {
