@@ -13,6 +13,8 @@
 #include "pm8998.dtsi"
 #include "pmi8998.dtsi"
 
+/delete-node/ &spss_mem;
+
 / {
 	chosen {
 		#address-cells = <2>;
@@ -85,8 +87,6 @@
 			reg = <0 0x97c00000 0 0x1400000>;
 			no-map;
 		};
-
-		/delete-node/memory@97b00000;
 
 		spss_mem: memory@99000000 {
 			reg = <0 0x99000000 0 0x100000>;
