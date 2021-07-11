@@ -188,20 +188,17 @@ void cpufreq_times_create_policy(struct cpufreq_policy *policy)
 
 void cpufreq_times_record_transition(struct cpufreq_freqs *freq)
 {
-	int index;
-	struct cpu_freqs *freqs = all_freqs[freq->cpu];
-	struct cpufreq_policy *policy;
+	(void*)freq;
+	// int index;
+	// struct cpufreq_policy *policy;
 
-	if (!freqs)
-		return;
+	// policy = cpufreq_cpu_get(freq->cpu);
+	// if (!policy)
+	// 	return;
 
-	policy = cpufreq_cpu_get(freq->cpu);
-	if (!policy)
-		return;
+	// index = cpufreq_frequency_table_get_index(policy, freq->new);
+	// if (index >= 0)
+	// 	WRITE_ONCE(freqs->last_index, index);
 
-	index = cpufreq_frequency_table_get_index(policy, freq->new);
-	if (index >= 0)
-		WRITE_ONCE(freqs->last_index, index);
-
-	cpufreq_cpu_put(policy);
+	// cpufreq_cpu_put(policy);
 }
