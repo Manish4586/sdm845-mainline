@@ -242,6 +242,9 @@ static int sdcardfs_name_match(struct dir_context *ctx, const char *name,
 	return 0;
 }
 
+extern int vfs_path_lookup(struct dentry *, struct vfsmount *,
+			   const char *, unsigned int, struct path *);
+
 /*
  * Main driver function for sdcardfs's lookup.
  *
