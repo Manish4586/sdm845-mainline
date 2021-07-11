@@ -110,7 +110,7 @@ static void *sdcardfs_clone_mnt_data(void *data)
 	struct sdcardfs_vfsmount_options *opt = kmalloc(sizeof(struct sdcardfs_vfsmount_options), GFP_KERNEL);
 	struct sdcardfs_vfsmount_options *old = data;
 
-	if (!opt)
+	if (!opt || !old)
 		return NULL;
 	opt->gid = old->gid;
 	opt->mask = old->mask;
@@ -122,18 +122,20 @@ static void sdcardfs_copy_mnt_data(void *data, void *newdata)
 	struct sdcardfs_vfsmount_options *old = data;
 	struct sdcardfs_vfsmount_options *new = newdata;
 
-	old->gid = new->gid;
-	old->mask = new->mask;
+	if (old) {
+		old->gid = new->gid;
+		old->mask = new->mask;
+	}
 }
 
-static void sdcardfs_update_mnt_data(void *data, struct fs_context *fc)
-{
-	struct sdcardfs_vfsmount_options *opts = data;
-	struct sdcardfs_context_options *fcopts = fc->fs_private;
+// static void sdcardfs_update_mnt_data(void *data, struct fs_context *fc)
+// {
+// 	struct sdcardfs_vfsmount_options *opts = data;
+// 	struct sdcardfs_context_options *fcopts = fc->fs_private;
 
-	opts->gid = fcopts->vfsopts.gid;
-	opts->mask = fcopts->vfsopts.mask;
-}
+// 	opts->gid = fcopts->vfsopts.gid;
+// 	opts->mask = fcopts->vfsopts.mask;
+// }
 
 /*
  * Called by iput() when the inode reference count reached zero
@@ -249,23 +251,23 @@ static void sdcardfs_umount_begin(struct super_block *sb)
 		lower_sb->s_op->umount_begin(lower_sb);
 }
 
-static int sdcardfs_show_options(struct vfsmount *mnt, struct seq_file *m,
+static int sdcardfs_show_options(struct seq_file *m,
 			struct dentry *root)
 {
 	struct sdcardfs_sb_info *sbi = SDCARDFS_SB(root->d_sb);
 	struct sdcardfs_mount_options *opts = &sbi->options;
-	struct sdcardfs_vfsmount_options *vfsopts = mnt->data;
+	//struct sdcardfs_vfsmount_options *vfsopts = mnt->data;
 
 	if (opts->fs_low_uid != 0)
 		seq_printf(m, ",fsuid=%u", opts->fs_low_uid);
 	if (opts->fs_low_gid != 0)
 		seq_printf(m, ",fsgid=%u", opts->fs_low_gid);
-	if (vfsopts->gid != 0)
-		seq_printf(m, ",gid=%u", vfsopts->gid);
+	// if (vfsopts->gid != 0)
+	// 	seq_printf(m, ",gid=%u", vfsopts->gid);
 	if (opts->multiuser)
 		seq_puts(m, ",multiuser");
-	if (vfsopts->mask)
-		seq_printf(m, ",mask=%u", vfsopts->mask);
+	// if (vfsopts->mask)
+	// 	seq_printf(m, ",mask=%u", vfsopts->mask);
 	if (opts->fs_user_id)
 		seq_printf(m, ",userid=%u", opts->fs_user_id);
 	if (opts->gid_derivation)
@@ -304,10 +306,10 @@ const struct super_operations sdcardfs_sops = {
 	.statfs		= sdcardfs_statfs,
 	.clone_mnt_data	= sdcardfs_clone_mnt_data,
 	.copy_mnt_data	= sdcardfs_copy_mnt_data,
-	.update_mnt_data = sdcardfs_update_mnt_data,
+	//.update_mnt_data = sdcardfs_update_mnt_data,
 	.evict_inode	= sdcardfs_evict_inode,
 	.umount_begin	= sdcardfs_umount_begin,
-	.show_options2	= sdcardfs_show_options,
+	.show_options	= sdcardfs_show_options,
 	.alloc_inode	= sdcardfs_alloc_inode,
 	.destroy_inode	= sdcardfs_destroy_inode,
 	.drop_inode	= generic_delete_inode,

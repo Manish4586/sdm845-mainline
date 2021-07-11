@@ -147,7 +147,7 @@ extern void sdcardfs_destroy_dentry_cache(void);
 extern int new_dentry_private_data(struct dentry *dentry);
 extern void free_dentry_private_data(struct dentry *dentry);
 extern struct dentry *sdcardfs_lookup(struct inode *dir, struct dentry *dentry,
-				unsigned int flags);
+				      unsigned int flags);
 extern struct inode *sdcardfs_iget(struct super_block *sb,
 				 struct inode *lower_inode, userid_t id);
 extern int sdcardfs_interpose(struct dentry *dentry, struct super_block *sb,
@@ -431,14 +431,14 @@ static inline int get_gid(struct vfsmount *mnt,
 		return multiuser_get_uid(data->userid, vfsopts->gid);
 }
 
-static inline int get_mode(struct vfsmount *mnt,
+static inline int get_mode(struct user_namespace *mnt_userns,
 		struct sdcardfs_inode_info *info,
 		struct sdcardfs_inode_data *data)
 {
 	int owner_mode;
 	int filtered_mode;
-	struct sdcardfs_vfsmount_options *opts = mnt->data;
-	int visible_mode = 0775 & ~opts->mask;
+	//struct sdcardfs_vfsmount_options *opts = mnt->data;
+	int visible_mode = 0775; // & ~mnt_userns->;
 
 
 	if (data->perm == PERM_PRE_ROOT) {
@@ -451,7 +451,7 @@ static inline int get_mode(struct vfsmount *mnt,
 		* belonging to a specific user should be in there; we still
 		* leave +x open for the default view.
 		*/
-		if (opts->gid == AID_SDCARD_RW)
+		if (true) // (opts->gid == AID_SDCARD_RW)
 			visible_mode = visible_mode & ~0006;
 		else
 			visible_mode = visible_mode & ~0007;
