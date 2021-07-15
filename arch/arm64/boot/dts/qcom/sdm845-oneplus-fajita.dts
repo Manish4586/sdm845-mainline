@@ -16,6 +16,7 @@
 	status = "okay";
 
 	compatible = "samsung,s6e3fc2x01";
+	pinctrl-0 = <&panel_te_pin &panel_esd_pin>;
 };
 
 &rmi4_f12 {
