@@ -19,6 +19,10 @@
 	pinctrl-0 = <&panel_te_pin &panel_esd_pin>;
 };
 
+&pmi8998_fg {
+	qcom,battery-capacity-ua = <3700000>;
+};
+
 &rmi4_f12 {
 	touchscreen-y-mm = <148>;
 };
