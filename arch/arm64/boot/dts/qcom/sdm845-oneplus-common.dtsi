@@ -425,6 +425,11 @@
 	firmware-name = "qcom/sdm845/oneplus6/mba.mbn", "qcom/sdm845/oneplus6/modem.mbn";
 };
 
+&venus {
+	status = "okay";
+	firmware-name = "qcom/sdm845/oneplus6/venus.mbn";
+};
+
 &pm8998_gpio {
 	volume_down_gpio: pm8998_gpio5 {
 		pinconf {
