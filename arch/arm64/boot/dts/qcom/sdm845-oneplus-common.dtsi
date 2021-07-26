@@ -124,6 +124,48 @@
 		vin-supply = <&vph_pwr>;
 	};
 
+	cam_iovdd: reg_cam_iovdd {
+		compatible = "regulator-fixed";
+		regulator-name = "cam_iovdd";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		enable-active-high;
+		gpio = <&tlmm 50 GPIO_ACTIVE_HIGH>;
+		vin-supply = <&vreg_s4a_1p8>;
+		regulator-always-on;
+	};
+
+	cam_ldo: reg_cam_ldo {
+		compatible = "regulator-fixed";
+		regulator-name = "cam_ldo";
+		regulator-min-microvolt = <1350000>;
+		regulator-max-microvolt = <1350000>;
+		enable-active-high;
+		gpio = <&tlmm 99 GPIO_ACTIVE_HIGH>;
+		regulator-always-on;
+	};
+
+	cam0_avdd: reg_cam0_avdd {
+		compatible = "regulator-fixed";
+		regulator-name = "cam0_avdd";
+		enable-active-high;
+		gpio = <&tlmm 40 GPIO_ACTIVE_HIGH>;
+		vin-supply = <&vreg_bob>;
+		regulator-always-on;
+	};
+
+	cam0_dvdd: reg_cam0_dvdd {
+		compatible = "regulator-fixed";
+		regulator-name = "cam0_dvdd";
+		regulator-min-microvolt = <1350000>;
+		regulator-max-microvolt = <1350000>;
+		regulator-enable-ramp-delay = <135>;
+		enable-active-high;
+		gpio = <&pm8998_gpio 11 GPIO_ACTIVE_HIGH>;
+		vin-supply = <&vreg_s3a_1p35>;
+		regulator-always-on;
+	};
+
 	/*
 	 * The touchscreen regulator seems to be controlled somehow by a gpio.
 	 * Model it as a fixed regulator and keep it on. Without schematics we
@@ -195,6 +237,9 @@
 			regulator-max-microvolt = <1028000>;
 		};
 
+		vdda_mipi_csi0_0p9:
+		vdda_mipi_csi1_0p9:
+		vdda_mipi_csi2_0p9:
 		vdda_mipi_dsi0_pll:
 		vdda_qlink_lv:
 		vdda_ufs1_core:
@@ -304,6 +349,63 @@
 		vreg_s3c_0p6: smps3 {
 			regulator-min-microvolt = <600000>;
 			regulator-max-microvolt = <600000>;
+		};
+	};
+};
+
+&cci {
+	status = "okay";
+};
+
+&camss {
+	vdda-csi0-supply = <&vdda_mipi_csi0_0p9>;
+	vdda-csi1-supply = <&vdda_mipi_csi1_0p9>;
+	vdda-csi2-supply = <&vdda_mipi_csi2_0p9>;
+
+	status = "okay";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		port@0 {
+			reg = <0>;
+			csiphy0_ep: endpoint {
+				clock-lanes = <7>;
+				data-lanes = <0 1 2 3 >;
+				remote-endpoint = <&imx519_ep>;
+			};
+		};
+	};
+};
+
+&cci_i2c0 {
+	camera@10 {
+		compatible = "sony,imx519";
+		reg = <0x10>;
+		// CAM0_RST_N
+		reset-gpios = <&tlmm 80 0>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&cam0_default>;
+
+		clocks = <&clock_camcc CAM_CC_MCLK0_CLK>;
+		clock-names = "xvclk";
+		clock-frequency = <24000000>;
+
+		power-domains = <&clock_camcc TITAN_TOP_GDSC>;
+
+		vdddo-supply = <&cam_iovdd>;
+		ldo-supply = <&cam_ldo>;
+		avdd-supply = <&cam0_avdd>;
+		dvdd-supply = <&cam0_dvdd>;
+
+		status = "okay";
+
+		port {
+			imx519_ep: endpoint {
+				clock-lanes = <1>;
+				data-lanes = <0 1>;
+				remote-endpoint = <&csiphy0_ep>;
+			};
 		};
 	};
 };
@@ -699,6 +801,24 @@
 
 &tlmm {
 	gpio-reserved-ranges = <0 4>, <81 4>;
+
+	cam0_default: cam0_default {
+		rst {
+			pins = "gpio28";
+			function = "gpio";
+
+			drive-strength = <2>;
+			bias-disable;
+		};
+
+		mclk0 {
+			pins = "gpio13";
+			function = "cam_mclk";
+
+			drive-strength = <2>;
+			bias-disable;
+		};
+	};
 
 	wcd_intr_default: wcd_intr_default {
 		pins = <54>;
