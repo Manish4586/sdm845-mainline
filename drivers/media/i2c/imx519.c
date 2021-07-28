@@ -3,6 +3,8 @@
 
 #include <asm/unaligned.h>
 #include <linux/acpi.h>
+#include <linux/clk.h>
+#include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/pm_runtime.h>
@@ -14,6 +16,8 @@
 #define IMX519_REG_MODE_SELECT		0x0100
 #define IMX519_MODE_STANDBY		0x00
 #define IMX519_MODE_STREAMING		0x01
+
+#define IMX519_TEMP_SENSE_CTRL		0x138
 
 /* Chip ID */
 #define IMX519_REG_CHIP_ID		0x0016
@@ -59,7 +63,7 @@
 #define IMX519_DGTL_GAIN_DEFAULT	256
 
 /* Test Pattern Control */
-#define IMX519_REG_TEST_PATTERN		0x0600
+#define IMX519_REG_TEST_PATTERN		0x0601
 #define IMX519_TEST_PATTERN_DISABLED		0
 #define IMX519_TEST_PATTERN_SOLID_COLOR		1
 #define IMX519_TEST_PATTERN_COLOR_BARS		2
@@ -73,6 +77,43 @@
 #define IMX519_LINK_FREQ_DEFAULT	456000000
 #define IMX519_EXT_CLK			24000000
 #define IMX519_LINK_FREQ_INDEX		0
+
+/*
+ * Initialisation delay between XCLR low->high and the moment when the sensor
+ * can start capture (i.e. can leave software stanby) must be not less than:
+ *   t4 + max(t5, t6 + <time to initialize the sensor register over I2C>)
+ * where
+ *   t4 is fixed, and is max 200uS,
+ *   t5 is fixed, and is 6000uS,
+ *   t6 depends on the sensor external clock, and is max 32000 clock periods.
+ * As per sensor datasheet, the external clock must be from 6MHz to 27MHz.
+ * So for any acceptable external clock t6 is always within the range of
+ * 1185 to 5333 uS, and is always less than t5.
+ * For this reason this is always safe to wait (t4 + t5) = 6200 uS, then
+ * initialize the sensor over I2C, and then exit the software standby.
+ *
+ * This start-up time can be optimized a bit more, if we start the writes
+ * over I2C after (t4+t6), but before (t4+t5) expires. But then sensor
+ * initialization over I2C may complete before (t4+t5) expires, and we must
+ * ensure that capture is not started before (t4+t5).
+ *
+ * This delay doesn't account for the power supply startup time. If needed,
+ * this should be taken care of via the regulator framework. E.g. in the
+ * case of DT for regulator-fixed one should define the startup-delay-us
+ * property.
+ */
+#define IMX519_XCLR_MIN_DELAY_US	6200
+#define IMX519_XCLR_DELAY_RANGE_US	1000
+
+/* regulator supplies */
+static const char * const imx519_supply_name[] = {
+	/* Supplies can be enabled in any order */
+	"VANA",  /* Analog (2.8V) supply */
+	"VDIG",  /* Digital Core (1.8V) supply */
+	"VDDL",  /* IF (1.8V ?) supply */
+};
+
+#define IMX519_NUM_SUPPLIES ARRAY_SIZE(imx519_supply_name)
 
 struct imx519_reg {
 	u16 address;
@@ -106,7 +147,6 @@ struct imx519_mode {
 };
 
 struct imx519_hwcfg {
-	u32 ext_clk;			/* sensor external clk */
 	s64 *link_freqs;		/* CSI-2 link frequencies */
 	unsigned int nr_of_link_freqs;
 };
@@ -124,6 +164,12 @@ struct imx519 {
 	struct v4l2_ctrl *exposure;
 	struct v4l2_ctrl *vflip;
 	struct v4l2_ctrl *hflip;
+
+	struct clk *xclk; /* system clock to imx519 */
+	u32 xclk_freq;
+
+	struct gpio_desc *reset_gpio;
+	struct regulator_bulk_data supplies[IMX519_NUM_SUPPLIES];
 
 	/* Current mode */
 	const struct imx519_mode *cur_mode;
@@ -468,7 +514,7 @@ static const struct imx519_reg mode_1920x1080_regs[] = {
 	{ 0x0111, 0x03 },
 	{ 0x0112, 0x0a },
 	{ 0x0113, 0x0a },
-	{ 0x0114, 0x02 },
+	{ 0x0114, 0x02 }, // LANE COUNT, 0x02 = 3 lane, 0x01 = 2 lane etc
 	{ 0x0342, 0x19 },
 	{ 0x0343, 0x00 },
 	{ 0x0340, 0x0d },
@@ -668,11 +714,11 @@ static const struct imx519_reg mode_4608x3456_regs[] = {
 };
 
 static const char * const imx519_test_pattern_menu[] = {
-	"Disabled",
-	"Solid Colour",
-	"Eight Vertical Colour Bars",
-	"Colour Bars With Fade to Grey",
-	"Pseudorandom Sequence (PN9)",
+	// "Disabled",
+	// "Solid Colour",
+	// "Eight Vertical Colour Bars",
+	// "Colour Bars With Fade to Grey",
+	// "Pseudorandom Sequence (PN9)",
 };
 
 /* supported link frequencies */
@@ -683,11 +729,11 @@ static const s64 link_freq_menu_items[] = {
 /* Mode configs */
 static const struct imx519_mode supported_modes[] = {
 	{
-		.width = 4608,
-		.height = 3456,
-		.fll_def = 3242,
-		.fll_min = 3242,
-		.llp = 3968,
+		.width = 1920,
+		.height = 1080,
+		.fll_def = 1306,
+		.fll_min = 1306,
+		.llp = 3672,
 		.link_freq_index = IMX519_LINK_FREQ_INDEX,
 		.reg_list = {
 			.num_of_regs = ARRAY_SIZE(mode_1920x1080_regs),
@@ -737,14 +783,15 @@ static int imx519_read_reg(struct imx519 *imx519, u16 reg, u32 len, u32 *val)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(&imx519->sd);
 	struct i2c_msg msgs[2];
-	u8 addr_buf[2];
-	u8 data_buf[4] = { 0 };
+	u8 addr_buf[2] = { reg >> 8, reg & 0xff };
+	u8 data_buf[4] = { 0, };
 	int ret;
 
-	if (len > 4)
+	if (len > 4){
+		dev_err(&client->dev, "len > 4\n");
 		return -EINVAL;
+	}
 
-	put_unaligned_be16(reg, addr_buf);
 	/* Write register address */
 	msgs[0].addr = client->addr;
 	msgs[0].flags = 0;
@@ -758,12 +805,15 @@ static int imx519_read_reg(struct imx519 *imx519, u16 reg, u32 len, u32 *val)
 	msgs[1].buf = &data_buf[4 - len];
 
 	ret = i2c_transfer(client->adapter, msgs, ARRAY_SIZE(msgs));
-	if (ret != ARRAY_SIZE(msgs))
+	if (ret != ARRAY_SIZE(msgs)){
+		dev_err(&client->dev, "ret != ARRAY_SIZE(msgs), ret = %d\n", ret);
 		return -EIO;
+	}
 
 	*val = get_unaligned_be32(data_buf);
 
 	return 0;
+
 }
 
 /* Write registers up to 4 at a time */
@@ -808,15 +858,21 @@ static int imx519_write_regs(struct imx519 *imx519,
 static int imx519_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 {
 	struct imx519 *imx519 = to_imx519(sd);
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
 	struct v4l2_mbus_framefmt *try_fmt =
 		v4l2_subdev_get_try_format(sd, fh->state, 0);
 
 	mutex_lock(&imx519->mutex);
 
+	dev_info(&client->dev, "Locked mutex");
+
 	/* Initialize try_fmt */
 	try_fmt->width = imx519->cur_mode->width;
+	dev_info(&client->dev, "Get width");
 	try_fmt->height = imx519->cur_mode->height;
+	dev_info(&client->dev, "Get height");
 	try_fmt->code = imx519_get_format_code(imx519);
+	dev_info(&client->dev, "Get format code");
 	try_fmt->field = V4L2_FIELD_NONE;
 
 	mutex_unlock(&imx519->mutex);
@@ -1040,6 +1096,8 @@ static int imx519_start_streaming(struct imx519 *imx519)
 	const struct imx519_reg_list *reg_list;
 	int ret;
 
+	dev_info(&client->dev, "%s", __func__);
+
 	/* Global Setting */
 	reg_list = &imx519_global_setting;
 	ret = imx519_write_regs(imx519, reg_list->regs, reg_list->num_of_regs);
@@ -1057,9 +1115,9 @@ static int imx519_start_streaming(struct imx519 *imx519)
 	}
 
 	/* set digital gain control to all color mode */
-	ret = imx519_write_reg(imx519, IMX519_REG_DPGA_USE_GLOBAL_GAIN, 1, 1);
-	if (ret)
-		return ret;
+	// ret = imx519_write_reg(imx519, IMX519_REG_DPGA_USE_GLOBAL_GAIN, 1, 1);
+	// if (ret)
+	// 	return ret;
 
 	/* Apply customized values from user */
 	ret =  __v4l2_ctrl_handler_setup(imx519->sd.ctrl_handler);
@@ -1073,6 +1131,8 @@ static int imx519_start_streaming(struct imx519 *imx519)
 /* Stop streaming */
 static int imx519_stop_streaming(struct imx519 *imx519)
 {
+	struct i2c_client *client = v4l2_get_subdevdata(&imx519->sd);
+	dev_info(&client->dev, "%s", __func__);
 	return imx519_write_reg(imx519, IMX519_REG_MODE_SELECT,
 				1, IMX519_MODE_STANDBY);
 }
@@ -1082,6 +1142,8 @@ static int imx519_set_stream(struct v4l2_subdev *sd, int enable)
 	struct imx519 *imx519 = to_imx519(sd);
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
 	int ret = 0;
+
+	dev_info(&client->dev, "%s", __func__);
 
 	mutex_lock(&imx519->mutex);
 	if (imx519->streaming == enable) {
@@ -1124,35 +1186,97 @@ err_unlock:
 	return ret;
 }
 
-static int __maybe_unused imx519_suspend(struct device *dev)
+// static int __maybe_unused imx519_suspend(struct device *dev)
+// {
+// 	struct v4l2_subdev *sd = dev_get_drvdata(dev);
+// 	struct imx519 *imx519 = to_imx519(sd);
+
+// 	if (imx519->streaming)
+// 		imx519_stop_streaming(imx519);
+
+// 	return 0;
+// }
+
+// static int __maybe_unused imx519_resume(struct device *dev)
+// {
+// 	struct v4l2_subdev *sd = dev_get_drvdata(dev);
+// 	struct imx519 *imx519 = to_imx519(sd);
+// 	int ret;
+
+// 	if (imx519->streaming) {
+// 		ret = imx519_start_streaming(imx519);
+// 		if (ret)
+// 			goto error;
+// 	}
+
+// 	return 0;
+
+// error:
+// 	imx519_stop_streaming(imx519);
+// 	imx519->streaming = 0;
+// 	return ret;
+// }
+
+/* Power/clock management functions */
+static int imx519_power_on(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct v4l2_subdev *sd = i2c_get_clientdata(client);
+	struct imx519 *imx519 = to_imx519(sd);
+	int ret;
+
+	ret = regulator_bulk_enable(IMX519_NUM_SUPPLIES,
+				    imx519->supplies);
+	if (ret) {
+		dev_err(&client->dev, "%s: failed to enable regulators\n",
+			__func__);
+		return ret;
+	}
+
+	ret = clk_prepare_enable(imx519->xclk);
+	if (ret) {
+		dev_err(&client->dev, "%s: failed to enable clock\n",
+			__func__);
+		goto reg_off;
+	}
+
+	gpiod_set_value_cansleep(imx519->reset_gpio, 1);
+	usleep_range(IMX519_XCLR_MIN_DELAY_US,
+		     IMX519_XCLR_MIN_DELAY_US + IMX519_XCLR_DELAY_RANGE_US);
+
+	dev_info(&client->dev, "%s: powered on", __func__);
+
+	return 0;
+
+reg_off:
+	regulator_bulk_disable(IMX519_NUM_SUPPLIES, imx519->supplies);
+
+	return ret;
+}
+
+static int imx519_power_off(struct device *dev)
 {
 	struct v4l2_subdev *sd = dev_get_drvdata(dev);
 	struct imx519 *imx519 = to_imx519(sd);
 
-	if (imx519->streaming)
-		imx519_stop_streaming(imx519);
+	gpiod_set_value_cansleep(imx519->reset_gpio, 0);
+	regulator_bulk_disable(IMX519_NUM_SUPPLIES, imx519->supplies);
+	clk_disable_unprepare(imx519->xclk);
 
 	return 0;
 }
 
-static int __maybe_unused imx519_resume(struct device *dev)
+static int imx519_get_regulators(struct imx519 *imx519)
 {
-	struct v4l2_subdev *sd = dev_get_drvdata(dev);
-	struct imx519 *imx519 = to_imx519(sd);
-	int ret;
+	struct i2c_client *client = v4l2_get_subdevdata(&imx519->sd);
+	unsigned int i;
 
-	if (imx519->streaming) {
-		ret = imx519_start_streaming(imx519);
-		if (ret)
-			goto error;
-	}
+	for (i = 0; i < IMX519_NUM_SUPPLIES; i++)
+		imx519->supplies[i].supply = imx519_supply_name[i];
 
-	return 0;
-
-error:
-	imx519_stop_streaming(imx519);
-	imx519->streaming = 0;
-	return ret;
+	return devm_regulator_bulk_get(&client->dev,
+				       IMX519_NUM_SUPPLIES,
+				       imx519->supplies);
 }
 
 /* Verify chip ID */
@@ -1172,7 +1296,7 @@ static int imx519_identify_module(struct imx519 *imx519)
 		return -EIO;
 	}
 
-	dev_info(&client->dev, "IMX519 SENSOR ID MATCHES!!!! ID = 0X%X", val);
+	dev_info(&client->dev, "%s : sensor_id = 0X%X", __func__, val);
 
 	return 0;
 }
@@ -1234,6 +1358,12 @@ static int imx519_init_controls(struct imx519 *imx519)
 	if (imx519->link_freq)
 		imx519->link_freq->flags |= V4L2_CTRL_FLAG_READ_ONLY;
 
+	if (ctrl_hdlr->error) {
+		ret = ctrl_hdlr->error;
+		dev_err(&client->dev, "v4l2_ctrl_new_int_menu failed: %d", ret);
+		goto error;
+	}
+
 	/* pixel_rate = link_freq * 2 * nr_of_lanes / bits_per_sample */
 	pixel_rate = imx519->link_def_freq * 2 * 4;
 	do_div(pixel_rate, 10);
@@ -1241,44 +1371,60 @@ static int imx519_init_controls(struct imx519 *imx519)
 	imx519->pixel_rate = v4l2_ctrl_new_std(ctrl_hdlr, &imx519_ctrl_ops,
 					       V4L2_CID_PIXEL_RATE, pixel_rate,
 					       pixel_rate, 1, pixel_rate);
+	if (ctrl_hdlr->error) {
+		ret = ctrl_hdlr->error;
+		dev_err(&client->dev, "v4l2_ctrl_new_std(pixel rate) failed: %d", ret);
+		goto error;
+	}
 
 	/* Initial vblank/hblank/exposure parameters based on current mode */
-	mode = imx519->cur_mode;
-	vblank_def = mode->fll_def - mode->height;
-	vblank_min = mode->fll_min - mode->height;
-	imx519->vblank = v4l2_ctrl_new_std(ctrl_hdlr, &imx519_ctrl_ops,
-					   V4L2_CID_VBLANK, vblank_min,
-					   IMX519_FLL_MAX - mode->height,
-					   1, vblank_def);
+	// mode = imx519->cur_mode;
+	// vblank_def = mode->fll_def - mode->height;
+	// vblank_min = mode->fll_min - mode->height;
+	// imx519->vblank = v4l2_ctrl_new_std(ctrl_hdlr, &imx519_ctrl_ops,
+	// 				   V4L2_CID_VBLANK, vblank_min,
+	// 				   IMX519_FLL_MAX - mode->height,
+	// 				   1, vblank_def);
+	// if (ctrl_hdlr->error) {
+	// 	ret = ctrl_hdlr->error;
+	// 	dev_err(&client->dev, "v4l2_ctrl_new_std(vblank) failed: %d", ret);
+	// 	goto error;
+	// }
 
-	hblank = mode->llp - mode->width;
-	imx519->hblank = v4l2_ctrl_new_std(ctrl_hdlr, &imx519_ctrl_ops,
-					   V4L2_CID_HBLANK, hblank, hblank,
-					   1, hblank);
-	if (imx519->hblank)
-		imx519->hblank->flags |= V4L2_CTRL_FLAG_READ_ONLY;
+	// hblank = mode->llp - mode->width;
+	// imx519->hblank = v4l2_ctrl_new_std(ctrl_hdlr, &imx519_ctrl_ops,
+	// 				   V4L2_CID_HBLANK, hblank, hblank,
+	// 				   1, hblank);
+	// if (imx519->hblank)
+	// 	imx519->hblank->flags |= V4L2_CTRL_FLAG_READ_ONLY;
+
+	// if (ctrl_hdlr->error) {
+	// 	ret = ctrl_hdlr->error;
+	// 	dev_err(&client->dev, "v4l2_ctrl_new_std(hblank) failed: %d", ret);
+	// 	goto error;
+	// }
 
 	/* fll >= exposure time + adjust parameter (default value is 18) */
-	exposure_max = mode->fll_def - 18;
-	imx519->exposure = v4l2_ctrl_new_std(ctrl_hdlr, &imx519_ctrl_ops,
-					     V4L2_CID_EXPOSURE,
-					     IMX519_EXPOSURE_MIN, exposure_max,
-					     IMX519_EXPOSURE_STEP,
-					     IMX519_EXPOSURE_DEFAULT);
+	// exposure_max = mode->fll_def - 18;
+	// imx519->exposure = v4l2_ctrl_new_std(ctrl_hdlr, &imx519_ctrl_ops,
+	// 				     V4L2_CID_EXPOSURE,
+	// 				     IMX519_EXPOSURE_MIN, exposure_max,
+	// 				     IMX519_EXPOSURE_STEP,
+	// 				     IMX519_EXPOSURE_DEFAULT);
 
 	imx519->hflip = v4l2_ctrl_new_std(ctrl_hdlr, &imx519_ctrl_ops,
 					  V4L2_CID_HFLIP, 0, 1, 1, 0);
 	imx519->vflip = v4l2_ctrl_new_std(ctrl_hdlr, &imx519_ctrl_ops,
 					  V4L2_CID_VFLIP, 0, 1, 1, 0);
 
-	v4l2_ctrl_new_std(ctrl_hdlr, &imx519_ctrl_ops, V4L2_CID_ANALOGUE_GAIN,
-			  IMX519_ANA_GAIN_MIN, IMX519_ANA_GAIN_MAX,
-			  IMX519_ANA_GAIN_STEP, IMX519_ANA_GAIN_DEFAULT);
+	// v4l2_ctrl_new_std(ctrl_hdlr, &imx519_ctrl_ops, V4L2_CID_ANALOGUE_GAIN,
+	// 		  IMX519_ANA_GAIN_MIN, IMX519_ANA_GAIN_MAX,
+	// 		  IMX519_ANA_GAIN_STEP, IMX519_ANA_GAIN_DEFAULT);
 
-	/* Digital gain */
-	v4l2_ctrl_new_std(ctrl_hdlr, &imx519_ctrl_ops, V4L2_CID_DIGITAL_GAIN,
-			  IMX519_DGTL_GAIN_MIN, IMX519_DGTL_GAIN_MAX,
-			  IMX519_DGTL_GAIN_STEP, IMX519_DGTL_GAIN_DEFAULT);
+	// /* Digital gain */
+	// v4l2_ctrl_new_std(ctrl_hdlr, &imx519_ctrl_ops, V4L2_CID_DIGITAL_GAIN,
+	// 		  IMX519_DGTL_GAIN_MIN, IMX519_DGTL_GAIN_MAX,
+	// 		  IMX519_DGTL_GAIN_STEP, IMX519_DGTL_GAIN_DEFAULT);
 
 	v4l2_ctrl_new_std_menu_items(ctrl_hdlr, &imx519_ctrl_ops,
 				     V4L2_CID_TEST_PATTERN,
@@ -1286,7 +1432,6 @@ static int imx519_init_controls(struct imx519 *imx519)
 				     0, 0, imx519_test_pattern_menu);
 	if (ctrl_hdlr->error) {
 		ret = ctrl_hdlr->error;
-		dev_err(&client->dev, "control init failed: %d", ret);
 		goto error;
 	}
 
@@ -1326,21 +1471,7 @@ static struct imx519_hwcfg *imx519_get_hwcfg(struct device *dev)
 	if (!cfg)
 		goto out_err;
 
-	ret = fwnode_property_read_u32(dev_fwnode(dev), "clock-frequency",
-				       &cfg->ext_clk);
-	if (ret) {
-		dev_err(dev, "can't get clock frequency");
-		goto out_err;
-	}
-
-	dev_dbg(dev, "ext clk: %d", cfg->ext_clk);
-	if (cfg->ext_clk != IMX519_EXT_CLK) {
-		dev_err(dev, "external clock %d is not supported",
-			cfg->ext_clk);
-		goto out_err;
-	}
-
-	dev_dbg(dev, "num of link freqs: %d", bus_cfg.nr_of_link_frequencies);
+	dev_info(dev, "num of link freqs: %d", bus_cfg.nr_of_link_frequencies);
 	if (!bus_cfg.nr_of_link_frequencies) {
 		dev_warn(dev, "no link frequencies defined");
 		goto out_err;
@@ -1383,19 +1514,48 @@ static int imx519_probe(struct i2c_client *client)
 	/* Initialize subdev */
 	v4l2_i2c_subdev_init(&imx519->sd, client, &imx519_subdev_ops);
 
-	/* Check module identity */
-	ret = imx519_identify_module(imx519);
-	if (ret) {
-		dev_err(&client->dev, "failed to find sensor: %d", ret);
-		goto error_probe;
-	}
-
 	imx519->hwcfg = imx519_get_hwcfg(&client->dev);
 	if (!imx519->hwcfg) {
 		dev_err(&client->dev, "failed to get hwcfg");
 		ret = -ENODEV;
 		goto error_probe;
 	}
+
+	/* Get system clock (xclk) */
+	imx519->xclk = devm_clk_get(&client->dev, NULL);
+	if (IS_ERR(imx519->xclk)) {
+		dev_err(&client->dev, "failed to get xclk\n");
+		// return PTR_ERR(imx519->xclk);
+	}
+
+	ret = fwnode_property_read_u32(dev_fwnode(&client->dev), "clock-frequency", &imx519->xclk_freq);
+	if (ret) {
+		dev_err(&client->dev, "could not get xclk frequency\n");
+		// return ret;
+	}
+
+	/* this driver currently expects 24MHz; allow 1% tolerance */
+	if (imx519->xclk_freq < 23760000 || imx519->xclk_freq > 24240000) {
+		dev_err(&client->dev, "xclk frequency not supported: %d Hz\n",
+			imx519->xclk_freq);
+		// return -EINVAL;
+	}
+
+	ret = clk_set_rate(imx519->xclk, imx519->xclk_freq);
+	if (ret) {
+		dev_err(&client->dev, "could not set xclk frequency\n");
+		// return ret;
+	}
+
+	ret = imx519_get_regulators(imx519);
+	if (ret) {
+		dev_err(&client->dev, "failed to get regulators\n");
+		return ret;
+	}
+
+	/* Request optional enable pin */
+	imx519->reset_gpio = devm_gpiod_get_optional(&client->dev, "reset",
+						     GPIOD_OUT_HIGH);
 
 	imx519->link_def_freq = link_freq_menu_items[IMX519_LINK_FREQ_INDEX];
 	for (i = 0; i < imx519->hwcfg->nr_of_link_freqs; i++) {
@@ -1413,6 +1573,31 @@ static int imx519_probe(struct i2c_client *client)
 
 	/* Set default mode to max resolution */
 	imx519->cur_mode = &supported_modes[0];
+
+	ret = imx519_power_on(&client->dev);
+	if (ret)
+		return ret;
+
+	ret = imx519_identify_module(imx519);
+	if (ret)
+		goto error_probe;
+
+	/* sensor doesn't enter LP-11 state upon power up until and unless
+	 * streaming is started, so upon power up switch the modes to:
+	 * streaming -> standby
+	 */
+	ret = imx519_write_reg(imx519, IMX519_REG_MODE_SELECT,
+			       1, IMX519_MODE_STREAMING);
+	if (ret < 0)
+		goto error_probe;
+	usleep_range(100, 110);
+
+	/* put sensor back to standby mode */
+	ret = imx519_write_reg(imx519, IMX519_REG_MODE_SELECT,
+			       1, IMX519_MODE_STANDBY);
+	if (ret < 0)
+		goto error_probe;
+	usleep_range(100, 110);
 
 	ret = imx519_init_controls(imx519);
 	if (ret) {
@@ -1443,9 +1628,11 @@ static int imx519_probe(struct i2c_client *client)
 	 * Device is already turned on by i2c-core with ACPI domain PM.
 	 * Enable runtime PM and turn off the device.
 	 */
-	pm_runtime_set_active(&client->dev);
-	pm_runtime_enable(&client->dev);
-	pm_runtime_idle(&client->dev);
+	// pm_runtime_set_active(&client->dev);
+	// pm_runtime_enable(&client->dev);
+	// pm_runtime_idle(&client->dev);
+
+	dev_info(&client->dev, "Probed successfully");
 
 	return 0;
 
@@ -1458,6 +1645,8 @@ error_handler_free:
 error_probe:
 	mutex_destroy(&imx519->mutex);
 
+	imx519_power_off(&client->dev);
+	dev_err(&client->dev, "imx519: Failed to probe!!!");
 	return ret;
 }
 
@@ -1478,30 +1667,28 @@ static int imx519_remove(struct i2c_client *client)
 	return 0;
 }
 
-static const struct dev_pm_ops imx519_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(imx519_suspend, imx519_resume)
-};
+// static const struct dev_pm_ops imx519_pm_ops = {
+// 	SET_SYSTEM_SLEEP_PM_OPS(imx519_suspend, imx519_resume)
+// };
 
-static const struct acpi_device_id imx519_acpi_ids[] __maybe_unused = {
-	{ "SONY319A" },
+static const struct of_device_id imx519_dt_ids[] = {
+	{ .compatible = "sony,imx519" },
 	{ /* sentinel */ }
 };
-MODULE_DEVICE_TABLE(acpi, imx519_acpi_ids);
+MODULE_DEVICE_TABLE(of, imx519_dt_ids);
+
 
 static struct i2c_driver imx519_i2c_driver = {
 	.driver = {
 		.name = "imx519",
-		.pm = &imx519_pm_ops,
-		.acpi_match_table = ACPI_PTR(imx519_acpi_ids),
+		//.pm = &imx519_pm_ops,
+		.of_match_table = imx519_dt_ids,
 	},
 	.probe_new = imx519_probe,
 	.remove = imx519_remove,
 };
 module_i2c_driver(imx519_i2c_driver);
 
-MODULE_AUTHOR("Qiu, Tianshu <tian.shu.qiu@intel.com>");
-MODULE_AUTHOR("Rapolu, Chiranjeevi <chiranjeevi.rapolu@intel.com>");
-MODULE_AUTHOR("Bingbu Cao <bingbu.cao@intel.com>");
-MODULE_AUTHOR("Yang, Hyungwoo <hyungwoo.yang@intel.com>");
+MODULE_AUTHOR("Caleb Connolly <caleb@connolly.tech>");
 MODULE_DESCRIPTION("Sony imx519 sensor driver");
 MODULE_LICENSE("GPL v2");
