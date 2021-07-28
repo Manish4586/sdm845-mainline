@@ -108,9 +108,10 @@
 /* regulator supplies */
 static const char * const imx519_supply_name[] = {
 	/* Supplies can be enabled in any order */
-	"VANA",  /* Analog (2.8V) supply */
-	"VDIG",  /* Digital Core (1.8V) supply */
-	"VDDL",  /* IF (1.8V ?) supply */
+	"vana",  /* Analog (2.8V) supply */
+	"vdig",  /* Digital Core (1.8V) supply */
+	"vio",  /* IF (1.05V ?) supply */
+	"ldo", /* lvs1 supply */
 };
 
 #define IMX519_NUM_SUPPLIES ARRAY_SIZE(imx519_supply_name)

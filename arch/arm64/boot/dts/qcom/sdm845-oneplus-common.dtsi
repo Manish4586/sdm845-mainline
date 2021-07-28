@@ -130,8 +130,8 @@
 		compatible = "regulator-fixed";
 		regulator-name = "cam0_1p05_supply";
 
-		regulator-min-microvolt = <1800000>;
-		regulator-max-microvolt = <1800000>;
+		regulator-min-microvolt = <1050000>;
+		regulator-max-microvolt = <1050000>;
 
 		gpio = <&tlmm 8 0>;
 		enable-active-high;
@@ -146,8 +146,10 @@
 		vbias-supply = <&vreg_bob>;
 	};
 
-	// From schematics
-	cam0_2p5_en: cam0-2p5-regulator {
+	// Named cam0_2p5_en in schematics
+	// but turns on a regulator named
+	// main_cam_2p8
+	cam0_2p8_en: cam0-2p5-regulator {
 		compatible = "regulator-fixed";
 		regulator-name = "cam0_2p5_supply";
 
@@ -411,10 +413,10 @@
 
 		power-domains = <&clock_camcc TITAN_TOP_GDSC>;
 
-		vdddo-supply = <&cam_vio_1p8>; // lvs1
+		vdig-supply = <&cam_vio_1p8>; // lvs1
 		ldo-supply = <&vreg_l21a_2p95>;
-		vana-supply = <&cam0_2p5_en>;
-		dig-supply = <&cam0_1p05_en>;
+		vana-supply = <&cam0_2p8_en>;
+		vio-supply = <&cam0_1p05_en>;
 
 		status = "okay";
 
