@@ -7,6 +7,7 @@
 
 /dts-v1/;
 
+#include <dt-bindings/clock/qcom,camcc-sdm845.h>
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/linux-event-codes.h>
 #include <dt-bindings/regulator/qcom,rpmh-regulator.h>
@@ -124,46 +125,45 @@
 		vin-supply = <&vph_pwr>;
 	};
 
-	cam_iovdd: reg_cam_iovdd {
+	// From schematics
+	cam0_1p05_en: cam0-1p05-regulator {
 		compatible = "regulator-fixed";
-		regulator-name = "cam_iovdd";
+		regulator-name = "cam0_1p05_supply";
+
 		regulator-min-microvolt = <1800000>;
 		regulator-max-microvolt = <1800000>;
-		enable-active-high;
-		gpio = <&tlmm 50 GPIO_ACTIVE_HIGH>;
-		vin-supply = <&vreg_s4a_1p8>;
-		regulator-always-on;
-	};
 
-	cam_ldo: reg_cam_ldo {
-		compatible = "regulator-fixed";
-		regulator-name = "cam_ldo";
-		regulator-min-microvolt = <1350000>;
-		regulator-max-microvolt = <1350000>;
+		gpio = <&tlmm 8 0>;
 		enable-active-high;
-		gpio = <&tlmm 99 GPIO_ACTIVE_HIGH>;
+		regulator-boot-on;
+		/*
+		 * HACK: FORCE THIS REGULATOR TO ALWAYS BE ON
+		 * FOR DEVELOPMENT
+		 */
 		regulator-always-on;
-	};
 
-	cam0_avdd: reg_cam0_avdd {
-		compatible = "regulator-fixed";
-		regulator-name = "cam0_avdd";
-		enable-active-high;
-		gpio = <&tlmm 40 GPIO_ACTIVE_HIGH>;
-		vin-supply = <&vreg_bob>;
-		regulator-always-on;
-	};
-
-	cam0_dvdd: reg_cam0_dvdd {
-		compatible = "regulator-fixed";
-		regulator-name = "cam0_dvdd";
-		regulator-min-microvolt = <1350000>;
-		regulator-max-microvolt = <1350000>;
-		regulator-enable-ramp-delay = <135>;
-		enable-active-high;
-		gpio = <&pm8998_gpio 11 GPIO_ACTIVE_HIGH>;
 		vin-supply = <&vreg_s3a_1p35>;
+		vbias-supply = <&vreg_bob>;
+	};
+
+	// From schematics
+	cam0_2p5_en: cam0-2p5-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "cam0_2p5_supply";
+
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+
+		gpio = <&tlmm 27 0>;
+		enable-active-high;
+		regulator-boot-on;
+		/*
+		 * HACK: FORCE THIS REGULATOR TO ALWAYS BE ON
+		 * FOR DEVELOPMENT
+		 */
 		regulator-always-on;
+
+		vin-supply = <&vreg_bob>;
 	};
 
 	/*
@@ -295,6 +295,12 @@
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 		};
 
+		vreg_l21a_2p95: ldo21 {
+			regulator-min-microvolt = <2704000>;
+			regulator-max-microvolt = <2960000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+
 		vdda_qusb_hs0_3p1:
 		vreg_l24a_3p075: ldo24 {
 			regulator-min-microvolt = <3088000>;
@@ -320,6 +326,18 @@
 			regulator-min-microvolt = <2856000>;
 			regulator-max-microvolt = <3008000>;
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+
+		cam_vio_1p8:
+		vreg_lvs1_1p8: lvs1 {
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <1800000>;
+
+			/*
+			* HACK: FORCE THIS REGULATOR TO ALWAYS BE ON
+			* FOR DEVELOPMENT
+			*/
+			regulator-always-on;
 		};
 	};
 
@@ -371,7 +389,7 @@
 			reg = <0>;
 			csiphy0_ep: endpoint {
 				clock-lanes = <7>;
-				data-lanes = <0 1 2 3 >;
+				data-lanes = <0 1 2>;
 				remote-endpoint = <&imx519_ep>;
 			};
 		};
@@ -379,31 +397,33 @@
 };
 
 &cci_i2c0 {
-	camera@10 {
+	camera@1a {
 		compatible = "sony,imx519";
-		reg = <0x10>;
+		reg = <0x1a>;
 		// CAM0_RST_N
-		reset-gpios = <&tlmm 80 0>;
+		reset-gpios = <&tlmm 28 0>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&cam0_default>;
 
 		clocks = <&clock_camcc CAM_CC_MCLK0_CLK>;
-		clock-names = "xvclk";
+		clock-names = "xclk";
 		clock-frequency = <24000000>;
 
 		power-domains = <&clock_camcc TITAN_TOP_GDSC>;
 
-		vdddo-supply = <&cam_iovdd>;
-		ldo-supply = <&cam_ldo>;
-		avdd-supply = <&cam0_avdd>;
-		dvdd-supply = <&cam0_dvdd>;
+		vdddo-supply = <&cam_vio_1p8>; // lvs1
+		ldo-supply = <&vreg_l21a_2p95>;
+		vana-supply = <&cam0_2p5_en>;
+		dig-supply = <&cam0_1p05_en>;
 
 		status = "okay";
 
 		port {
 			imx519_ep: endpoint {
-				clock-lanes = <1>;
-				data-lanes = <0 1>;
+				clock-lanes = <0>;
+				data-lanes = <0 1 2>;
+				link-frequencies =
+							/bits/ 64 <456000000>;
 				remote-endpoint = <&csiphy0_ep>;
 			};
 		};
