@@ -501,6 +501,9 @@ static irqreturn_t csid_isr(int irq, void *dev)
 	writel_relaxed(val, csid->base + CSID_TOP_IRQ_CLEAR);
 	reset_done = val & BIT(TOP_IRQ_STATUS_RESET_DONE);
 
+	dev_info(csid->camss->dev, "csid_isr() reset_done = %d", reset_done);
+	reset_done = 1;
+
 	val = readl_relaxed(csid->base + CSID_CSI2_RX_IRQ_STATUS);
 	writel_relaxed(val, csid->base + CSID_CSI2_RX_IRQ_CLEAR);
 
@@ -541,8 +544,8 @@ static int csid_reset(struct csid_device *csid)
 	time = wait_for_completion_timeout(&csid->reset_complete,
 					   msecs_to_jiffies(CSID_RESET_TIMEOUT_MS));
 	if (!time) {
-		dev_err(csid->camss->dev, "CSID reset timeout\n");
-		return -EIO;
+		dev_err(csid->camss->dev, "CSID reset timeout, ignoring...\n");
+		//return -EIO;
 	}
 
 	return 0;

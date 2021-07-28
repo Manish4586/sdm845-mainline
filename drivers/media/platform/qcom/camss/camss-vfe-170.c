@@ -371,6 +371,8 @@ static irqreturn_t vfe_isr(int irq, void *dev)
 	if (status0 & STATUS_0_RESET_ACK)
 		vfe->isr_ops.reset_ack(vfe);
 
+	dev_info(vfe->camss->dev, "vfe_isr() reset_done = %d", status0 & STATUS_0_RESET_ACK);
+
 	for (i = VFE_LINE_RDI0; i <= VFE_LINE_RDI2; i++)
 		if (status0 & STATUS_0_RDI_REG_UPDATE(i))
 			vfe->isr_ops.reg_update(vfe, i);
