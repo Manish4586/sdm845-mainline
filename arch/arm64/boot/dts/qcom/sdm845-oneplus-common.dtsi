@@ -402,13 +402,13 @@
 	camera@1a {
 		compatible = "sony,imx519";
 		reg = <0x1a>;
-		// CAM0_RST_N
+
 		reset-gpios = <&tlmm 28 0>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&cam0_default>;
 
 		clocks = <&clock_camcc CAM_CC_MCLK0_CLK>;
-		clock-names = "xclk";
+		clock-names = "xvclk";
 		clock-frequency = <24000000>;
 
 		power-domains = <&clock_camcc TITAN_TOP_GDSC>;
@@ -423,7 +423,7 @@
 		port {
 			imx519_ep: endpoint {
 				clock-lanes = <0>;
-				data-lanes = <0 1 2>;
+				data-lanes = <1 2 3>;
 				link-frequencies =
 							/bits/ 64 <456000000>;
 				remote-endpoint = <&csiphy0_ep>;

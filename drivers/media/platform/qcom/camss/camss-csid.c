@@ -155,6 +155,8 @@ static int csid_set_power(struct v4l2_subdev *sd, int on)
 	struct device *dev = csid->camss->dev;
 	int ret;
 
+	dev_info(dev, "%s: on = %d", __func__, on);
+
 	if (on) {
 		ret = pm_runtime_resume_and_get(dev);
 		if (ret < 0)
@@ -214,7 +216,10 @@ static int csid_set_power(struct v4l2_subdev *sd, int on)
 static int csid_set_stream(struct v4l2_subdev *sd, int enable)
 {
 	struct csid_device *csid = v4l2_get_subdevdata(sd);
+	struct device *dev = csid->camss->dev;
 	int ret;
+
+	dev_info(dev, "%s: enable = %d", __func__, enable);
 
 	if (enable) {
 		ret = v4l2_ctrl_handler_setup(&csid->ctrls);

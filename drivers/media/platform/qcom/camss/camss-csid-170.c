@@ -335,6 +335,8 @@ static void csid_configure_stream(struct csid_device *csid, u8 enable)
 	struct v4l2_mbus_framefmt *input_format = &csid->fmt[MSM_CSID_PAD_SRC];
 	const struct csid_format *format = csid_get_fmt_entry(csid->formats, csid->nformats,
 							      input_format->code);
+	struct device *dev = csid->camss->dev;
+	dev_info(dev, "%s:", __func__);
 
 	if (!lane_cnt)
 		lane_cnt = 4;
@@ -478,7 +480,7 @@ static u32 csid_hw_version(struct csid_device *csid)
 	hw_gen = (hw_version >> HW_VERSION_GENERATION) & 0xF;
 	hw_rev = (hw_version >> HW_VERSION_REVISION) & 0xFFF;
 	hw_step = (hw_version >> HW_VERSION_STEPPING) & 0xFFFF;
-	dev_dbg(csid->camss->dev, "CSID HW Version = %u.%u.%u\n",
+	dev_info(csid->camss->dev, "CSID HW Version = %u.%u.%u\n",
 		hw_gen, hw_rev, hw_step);
 
 	return hw_version;
@@ -501,7 +503,7 @@ static irqreturn_t csid_isr(int irq, void *dev)
 	writel_relaxed(val, csid->base + CSID_TOP_IRQ_CLEAR);
 	reset_done = val & BIT(TOP_IRQ_STATUS_RESET_DONE);
 
-	dev_info(csid->camss->dev, "csid_isr() reset_done = %d", reset_done);
+	dev_info(csid->camss->dev, "csid_isr(), irq_status = 0x%x, reset_done = %d", val, reset_done);
 	reset_done = 1;
 
 	val = readl_relaxed(csid->base + CSID_CSI2_RX_IRQ_STATUS);
@@ -530,6 +532,8 @@ static int csid_reset(struct csid_device *csid)
 	unsigned long time;
 	u32 val;
 
+	dev_info(csid->camss->dev, "%s", __func__);
+
 	reinit_completion(&csid->reset_complete);
 
 	writel_relaxed(1, csid->base + CSID_TOP_IRQ_CLEAR);
@@ -544,8 +548,8 @@ static int csid_reset(struct csid_device *csid)
 	time = wait_for_completion_timeout(&csid->reset_complete,
 					   msecs_to_jiffies(CSID_RESET_TIMEOUT_MS));
 	if (!time) {
-		dev_err(csid->camss->dev, "CSID reset timeout, ignoring...\n");
-		//return -EIO;
+		dev_err(csid->camss->dev, "CSID reset timeout\n");
+		return -EIO;
 	}
 
 	return 0;
