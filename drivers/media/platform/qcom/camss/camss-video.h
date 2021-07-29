@@ -139,7 +139,7 @@ static const char* pattern_str(unsigned int pattern) {
 
 static void dumpreg(const char *core, u32 reg, u32 val)
 {
-	printk("%s %s @ 0x%x: ??? <- 0x%08X\n", __func__, core, reg, val);
+	printk("qcom-camss %s() %s @ 0x%x: 0x%08X\n", __func__, core, reg, val);
 }
 
 
@@ -1070,6 +1070,8 @@ static void dumpreg_ife(const char *core, u32 reg, u32 val)
 
 
 static void reg_addr_decode(u64 reg_base_unmapped, u32 reg, u32 val) {
+	//  0xffffa597062e02d0
+	printk("%s: reg_base_unmapped: 0x%8llx", __func__, reg_base_unmapped);
 	if (reg_base_unmapped >= 0xac65000 && reg_base_unmapped <= (0xac65000 + 0x1000)) {
 		dumpreg("csiphy0", reg, val);
 	} else if (reg_base_unmapped >= 0xac66000 && reg_base_unmapped <= (0xac66000 + 0x1000)) {
