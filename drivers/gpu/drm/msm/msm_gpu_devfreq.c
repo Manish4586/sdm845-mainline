@@ -9,6 +9,7 @@
 
 #include <linux/devfreq.h>
 #include <linux/devfreq_cooling.h>
+#include <linux/pm_domain.h>
 
 /*
  * Power Management:
@@ -40,6 +41,9 @@ static int msm_devfreq_target(struct device *dev, unsigned long *freq,
 		gpu->funcs->gpu_set_freq(gpu, opp);
 	else
 		clk_set_rate(gpu->core_clk, *freq);
+
+	// dev_info(dev, "Setting performance state, opp_voltage = %d", dev_pm_opp_get_voltage(opp));
+	// dev_pm_genpd_set_performance_state(dev, dev_pm_opp_get_level(opp));
 
 	dev_pm_opp_put(opp);
 

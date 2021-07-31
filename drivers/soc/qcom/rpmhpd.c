@@ -423,6 +423,8 @@ static int rpmhpd_set_performance_state(struct generic_pm_domain *domain,
 	struct rpmhpd *pd = domain_to_rpmhpd(domain);
 	int ret = 0, i;
 
+	dev_info(&domain->dev, "%s(domain = %s, level = %d)", __func__, domain->name, level);
+
 	mutex_lock(&rpmhpd_lock);
 
 	for (i = 0; i < pd->level_count; i++)
@@ -459,6 +461,8 @@ static int rpmhpd_update_level_mapping(struct rpmhpd *rpmhpd)
 {
 	int i;
 	const u16 *buf;
+
+	dev_info(rpmhpd->dev, "%s(rpmhd = %s)", __func__, rpmhpd->res_name);
 
 	buf = cmd_db_read_aux_data(rpmhpd->res_name, &rpmhpd->level_count);
 	if (IS_ERR(buf))
