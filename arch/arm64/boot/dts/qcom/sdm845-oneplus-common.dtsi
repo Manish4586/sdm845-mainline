@@ -302,8 +302,8 @@
 		vdd-s4-supply = <&vph_pwr>;
 
 		pm8005_s1: smps1 { /* VDD_GFX supply */
-			regulator-min-microvolt = <988000>; /*DONOTUPSTREAM*/
-			/* regulator-min-microvolt = <516000>; */
+			//regulator-min-microvolt = <716000>; /*DONOTUPSTREAM*/
+			regulator-min-microvolt = <516000>;
 			regulator-max-microvolt = <1088000>;
 			regulator-enable-ramp-delay = <500>;
 			regulator-always-on;
