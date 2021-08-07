@@ -4506,7 +4506,7 @@
 
 				opp-414000000 {
 					opp-hz = /bits/ 64 <414000000>;
-					opp-level = <RPMH_REGULATOR_LEVEL_SVS_L1>;
+					opp-level = <RPMH_REGULATOR_LEVEL_NOM>;
 					opp-peak-kBps = <4068000>;
 				};
 

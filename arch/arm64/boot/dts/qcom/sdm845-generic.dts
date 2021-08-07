@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * SDM845 Generic DTS.
+ *
+ * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ */
+
+/dts-v1/;
+
+#include "sdm845.dtsi"
+
+/ {
+	model = "SDM845 Generic";
+	compatible = "qcom,sdm845";
+};
