@@ -24,6 +24,29 @@ struct q6voice_service {
 static DEFINE_SPINLOCK(q6voice_services_lock);
 static struct q6voice_service *q6voice_services[Q6VOICE_SERVICE_COUNT] = {0};
 
+const char *q6voice_get_session_name(enum q6voice_path_type path)
+{
+	switch (path) {
+	case Q6VOICE_PATH_VOICE:
+		return "default modem voice";
+	case Q6VOICE_PATH_VOLTE:
+		return "default volte voice";
+	case Q6VOICE_PATH_VOICE2:
+		return "10DC1000";
+	case Q6VOICE_PATH_QCHAT:
+		return "10803000";
+	case Q6VOICE_PATH_VOWLAN:
+		return "10002000";
+	case Q6VOICE_PATH_VOICEMMODE1:
+		return "11C05000";
+	case Q6VOICE_PATH_VOICEMMODE2:
+		return "11DC5000";
+	default:
+		return NULL;
+	}
+}
+EXPORT_SYMBOL_GPL(q6voice_get_session_name);
+
 int q6voice_common_probe(struct apr_device *adev, enum q6voice_service_type type)
 {
 	struct device *dev = &adev->dev;

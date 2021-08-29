@@ -46,27 +46,6 @@ struct vss_imvm_cmd_attach_vocproc_cmd {
 #define VSS_IMVM_CMD_START_VOICE			0x00011190
 #define VSS_IMVM_CMD_STOP_VOICE				0x00011192
 
-static inline const char *q6mvm_session_name(enum q6voice_path_type path)
-{
-	switch (path) {
-	case Q6VOICE_PATH_VOICE:
-		return "default modem voice";
-	case Q6VOICE_PATH_VOLTE:
-		return "default volte voice";
-	case Q6VOICE_PATH_VOICE2:
-		return "10DC1000";
-	case Q6VOICE_PATH_QCHAT:
-		return "10803000";
-	case Q6VOICE_PATH_VOWLAN:
-		return "10002000";
-	case Q6VOICE_PATH_VOICEMMODE1:
-		return "11C05000";
-	case Q6VOICE_PATH_VOICEMMODE2:
-		return "11DC5000";
-	default:
-		return NULL;
-	}
-}
 
 static int q6mvm_set_dual_control(struct q6voice_session *mvm)
 {
@@ -90,7 +69,7 @@ struct q6voice_session *q6mvm_session_create(enum q6voice_path_type path)
 	cmd.hdr.pkt_size = sizeof(cmd);
 	cmd.hdr.opcode = VSS_IMVM_CMD_CREATE_PASSIVE_CONTROL_SESSION;
 
-	session_name = q6mvm_session_name(path);
+	session_name = q6voice_get_session_name(path);
 	if (session_name)
 		strlcpy(cmd.name, session_name, sizeof(cmd.name));
 

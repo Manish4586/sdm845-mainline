@@ -8,6 +8,32 @@
 #include "q6cvs.h"
 #include "q6voice-common.h"
 
+#define VSS_ISTREAM_CMD_CREATE_PASSIVE_CONTROL_SESSION	0x00011140
+
+struct cvs_create_passive_control_session_cmd {
+	struct apr_hdr hdr;
+	char name[20];
+} __packed;
+
+struct q6voice_session *q6cvs_session_create(enum q6voice_path_type path)
+{
+	struct cvs_create_passive_control_session_cmd cmd;
+	struct q6voice_session *cvs;
+	const char *session_name;
+
+	cmd.hdr.pkt_size = sizeof(cmd);
+	cmd.hdr.opcode = VSS_ISTREAM_CMD_CREATE_PASSIVE_CONTROL_SESSION;
+
+	session_name = q6voice_get_session_name(path);
+	if (session_name)
+		strlcpy(cmd.name, session_name, sizeof(cmd.name));
+
+	cvs = q6voice_session_create(Q6VOICE_SERVICE_CVS, path, &cmd.hdr);
+
+	return cvs;
+}
+EXPORT_SYMBOL_GPL(q6cvs_session_create);
+
 static int q6cvs_probe(struct apr_device *adev)
 {
 	return q6voice_common_probe(adev, Q6VOICE_SERVICE_CVS);

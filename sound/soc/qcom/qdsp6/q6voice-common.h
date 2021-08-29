@@ -30,6 +30,7 @@ struct q6voice_session {
 	u32 result;
 };
 
+const char *q6voice_get_session_name(enum q6voice_path_type path);
 int q6voice_common_probe(struct apr_device *adev, enum q6voice_service_type type);
 int q6voice_common_remove(struct apr_device *adev);
 

@@ -6,4 +6,6 @@
 
 struct q6voice_session;
 
+struct q6voice_session *q6cvs_session_create(enum q6voice_path_type path);
+
 #endif /*_Q6_CVS_H */
