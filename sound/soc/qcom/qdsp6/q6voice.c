@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
 // Copyright (c) 2020, Stephan Gerhold
-
+#define DEBUG
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/mutex.h>

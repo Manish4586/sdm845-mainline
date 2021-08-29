@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (c) 2020, Stephan Gerhold
-
+#define DEBUG
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
