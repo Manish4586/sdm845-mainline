@@ -478,10 +478,10 @@
 		};
 	};
 
-	dai-link-cs-voice {
-		link-name = "CS-Voice";
+	dai-link-voicemmode2 {
+		link-name = "VoiceMMode2";
 		cpu {
-			sound-dai = <&q6voicedai CS_VOICE>;
+			sound-dai = <&q6voicedai VOICEMMODE2>;
 		};
 	};
 

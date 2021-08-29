@@ -15,7 +15,7 @@ static int q6voice_dai_startup(struct snd_pcm_substream *substream,
 {
 	struct q6voice *v = snd_soc_dai_get_drvdata(dai);
 
-	return q6voice_start(v, Q6VOICE_PATH_VOICE, substream->stream);
+	return q6voice_start(v, Q6VOICE_PATH_VOICEMMODE2, substream->stream);
 }
 
 static void q6voice_dai_shutdown(struct snd_pcm_substream *substream,
@@ -23,7 +23,7 @@ static void q6voice_dai_shutdown(struct snd_pcm_substream *substream,
 {
 	struct q6voice *v = snd_soc_dai_get_drvdata(dai);
 
-	q6voice_stop(v, Q6VOICE_PATH_VOICE, substream->stream);
+	q6voice_stop(v, Q6VOICE_PATH_VOICEMMODE2, substream->stream);
 }
 
 static struct snd_soc_dai_ops q6voice_dai_ops = {
@@ -33,11 +33,11 @@ static struct snd_soc_dai_ops q6voice_dai_ops = {
 
 static struct snd_soc_dai_driver q6voice_dais[] = {
 	{
-		.id = CS_VOICE,
-		.name = "CS-VOICE",
+		.id = VOICEMMODE2,
+		.name = "VoiceMMode2",
 		/* The constraints here are not really meaningful... */
 		.playback = {
-			.stream_name =	"CS-VOICE Playback",
+			.stream_name =	"VoiceMMode2 Playback",
 			.formats =	SNDRV_PCM_FMTBIT_S16_LE,
 			.rates =	SNDRV_PCM_RATE_8000,
 			.rate_min =	8000,
@@ -46,7 +46,7 @@ static struct snd_soc_dai_driver q6voice_dais[] = {
 			.channels_max =	1,
 		},
 		.capture = {
-			.stream_name =	"CS-VOICE Capture",
+			.stream_name =	"VoiceMMode2 Capture",
 			.formats =	SNDRV_PCM_FMTBIT_S16_LE,
 			.rates =	SNDRV_PCM_RATE_8000,
 			.rate_min =	8000,
@@ -77,14 +77,14 @@ static int q6voice_dai_open(struct snd_soc_component *component,
 }
 
 static const struct snd_soc_dapm_widget q6voice_dapm_widgets[] = {
-	SND_SOC_DAPM_AIF_IN("CS-VOICE_DL1", "CS-VOICE Playback", 0, SND_SOC_NOPM, 0, 0),
-	SND_SOC_DAPM_AIF_OUT("CS-VOICE_UL1", "CS-VOICE Capture", 0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_IN("VOICEMMODE2_DL", "VoiceMMode2 Playback", 0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_OUT("VOICEMMODE2_UL", "VoiceMMode2 Capture", 0, SND_SOC_NOPM, 0, 0),
 };
 
 static const struct snd_soc_dapm_route q6voice_dapm_routes[] = {
 	/* TODO: Make routing configurable */
-	{"CS-VOICE_UL1", NULL, "TERT_MI2S_TX"},
-	{"PRI_MI2S_RX", NULL, "CS-VOICE_DL1"},
+	{"VOICEMMODE2_UL", NULL, "SLIMBUS_0_TX"},
+	{"QUAT_MI2S_RX", NULL, "VOICEMMODE2_DL"},
 };
 
 static const struct snd_soc_component_driver q6voice_dai_component = {

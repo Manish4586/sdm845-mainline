@@ -15,7 +15,7 @@
 #define VSS_IVOCPROC_PORT_ID_NONE	0xFFFF
 
 #define VSS_IVOCPROC_TOPOLOGY_ID_NONE			0x00010F70
-#define VSS_IVOCPROC_TOPOLOGY_ID_TX_SM_ECNS		0x00010F71
+#define VSS_IVOCPROC_TOPOLOGY_ID_TX_SM_ECNS_V2		0x00010F89
 #define VSS_IVOCPROC_TOPOLOGY_ID_TX_DM_FLUENCE		0x00010F72
 
 #define VSS_IVOCPROC_TOPOLOGY_ID_RX_DEFAULT		0x00010F77
@@ -28,7 +28,7 @@
 #define VSS_IVOCPROC_CMD_ENABLE				0x000100C6
 #define VSS_IVOCPROC_CMD_DISABLE			0x000110E1
 
-#define VSS_IVOCPROC_CMD_CREATE_FULL_CONTROL_SESSION_V2	0x000112BF
+#define VSS_IVOCPROC_CMD_CREATE_FULL_CONTROL_SESSION_V3	0x00013169
 
 struct vss_ivocproc_cmd_create_full_control_session_v2_cmd {
 	struct apr_hdr hdr;
@@ -97,10 +97,10 @@ struct q6voice_session *q6cvp_session_create(enum q6voice_path_type path,
 	struct vss_ivocproc_cmd_create_full_control_session_v2_cmd cmd;
 
 	cmd.hdr.pkt_size = sizeof(cmd);
-	cmd.hdr.opcode = VSS_IVOCPROC_CMD_CREATE_FULL_CONTROL_SESSION_V2;
+	cmd.hdr.opcode = VSS_IVOCPROC_CMD_CREATE_FULL_CONTROL_SESSION_V3;
 
 	/* TODO: Implement calibration */
-	cmd.tx_topology_id = VSS_IVOCPROC_TOPOLOGY_ID_TX_SM_ECNS;
+	cmd.tx_topology_id = VSS_IVOCPROC_TOPOLOGY_ID_TX_SM_ECNS_V2;
 	cmd.rx_topology_id = VSS_IVOCPROC_TOPOLOGY_ID_RX_DEFAULT;
 
 	cmd.direction = VSS_IVOCPROC_DIRECTION_RX_TX;
