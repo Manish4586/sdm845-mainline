@@ -50,7 +50,7 @@ struct q6voice {
 static int q6voice_path_start(struct q6voice_path *p)
 {
 	struct device *dev = p->v->dev;
-	struct q6voice_session *mvm, *cvp;
+	struct q6voice_session *mvm, *cvs, *cvp;
 	int ret;
 
 	dev_dbg(dev, "start path %d\n", p->type);
@@ -61,6 +61,21 @@ static int q6voice_path_start(struct q6voice_path *p)
 		if (IS_ERR(mvm))
 			return PTR_ERR(mvm);
 		p->runtime->sessions[Q6VOICE_SERVICE_MVM] = mvm;
+	}
+
+	cvs = p->runtime->sessions[Q6VOICE_SERVICE_CVS];
+	if (!cvs) {
+		cvs = q6cvs_session_create(p->type);
+		if (IS_ERR(cvs))
+			return PTR_ERR(cvs);
+		p->runtime->sessions[Q6VOICE_SERVICE_CVS] = cvs;
+	}
+
+	ret = q6mvm_set_dual_control(mvm);
+	if (ret) {
+		dev_err(mvm->dev, "failed to set dual control: %d\n", ret);
+		q6voice_session_release(mvm);
+		return ret;
 	}
 
 	cvp = p->runtime->sessions[Q6VOICE_SERVICE_CVP];

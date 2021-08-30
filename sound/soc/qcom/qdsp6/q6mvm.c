@@ -47,7 +47,7 @@ struct vss_imvm_cmd_attach_vocproc_cmd {
 #define VSS_IMVM_CMD_STOP_VOICE				0x00011192
 
 
-static int q6mvm_set_dual_control(struct q6voice_session *mvm)
+int q6mvm_set_dual_control(struct q6voice_session *mvm)
 {
 	struct vss_imvm_cmd_set_policy_dual_control_cmd cmd;
 
@@ -58,13 +58,13 @@ static int q6mvm_set_dual_control(struct q6voice_session *mvm)
 
 	return q6voice_common_send(mvm, &cmd.hdr);
 }
+EXPORT_SYMBOL_GPL(q6mvm_set_dual_control);
 
 struct q6voice_session *q6mvm_session_create(enum q6voice_path_type path)
 {
 	struct vss_imvm_cmd_create_control_session_cmd cmd;
 	struct q6voice_session *mvm;
 	const char *session_name;
-	int ret;
 
 	cmd.hdr.pkt_size = sizeof(cmd);
 	cmd.hdr.opcode = VSS_IMVM_CMD_CREATE_PASSIVE_CONTROL_SESSION;
@@ -76,13 +76,6 @@ struct q6voice_session *q6mvm_session_create(enum q6voice_path_type path)
 	mvm = q6voice_session_create(Q6VOICE_SERVICE_MVM, path, &cmd.hdr);
 	if (IS_ERR(mvm))
 		return mvm;
-
-	ret = q6mvm_set_dual_control(mvm);
-	if (ret) {
-		dev_err(mvm->dev, "failed to set dual control: %d\n", ret);
-		q6voice_session_release(mvm);
-		return ERR_PTR(ret);
-	}
 
 	return mvm;
 }
