@@ -28,6 +28,8 @@
 #define VSS_IVOCPROC_CMD_ENABLE				0x000100C6
 #define VSS_IVOCPROC_CMD_DISABLE			0x000110E1
 
+#define VSS_IVOCPROC_CMD_TOPOLOGY_COMMIT    0x00013198
+
 #define VSS_IVOCPROC_CMD_CREATE_FULL_CONTROL_SESSION_V3	0x00013169
 
 struct vss_ivocproc_cmd_create_full_control_session_v2_cmd {
@@ -124,6 +126,17 @@ int q6cvp_enable(struct q6voice_session *cvp, bool state)
 	return q6voice_common_send(cvp, &cmd.hdr);
 }
 EXPORT_SYMBOL_GPL(q6cvp_enable);
+
+int q6cvp_send_topology_commit(struct q6voice_session *cvp)
+{
+	struct apr_pkt cmd;
+
+	cmd.hdr.pkt_size = APR_HDR_SIZE;
+	cmd.hdr.opcode = VSS_IVOCPROC_CMD_TOPOLOGY_COMMIT;
+
+	return q6voice_common_send(cvp, &cmd.hdr);
+}
+EXPORT_SYMBOL_GPL(q6cvp_send_topology_commit);
 
 static int q6cvp_probe(struct apr_device *adev)
 {

@@ -88,6 +88,12 @@ static int q6voice_path_start(struct q6voice_path *p)
 		p->runtime->sessions[Q6VOICE_SERVICE_CVP] = cvp;
 	}
 
+	// ret = q6cvp_send_topology_commit(cvp);
+	// if (ret) {
+	// 	dev_err(dev, "failed to send topology commit: %d\n", ret);
+	// 	goto cvp_err;
+	// }
+
 	ret = q6cvp_enable(cvp, true);
 	if (ret) {
 		dev_err(dev, "failed to enable cvp: %d\n", ret);
